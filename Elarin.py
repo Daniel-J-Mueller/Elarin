@@ -123,6 +123,8 @@ class Moment:
         self.association = None
         self.spectrum = None
         self.vector = None
+        # how predictive this memory has been (0.0–1.0)
+        self.predictive_value = 0.5
 
 class MemoryBank:
     def __init__(self, maxlen=100000):
@@ -233,6 +235,7 @@ class ElarinCore:
         # Prediction and boredom tracking
         self.prev_entropy = self.state["entropy"]
         self.predicted_vec = None
+        self.predicted_moment = None
         self.bored_start = None
 
         # Vision feed
@@ -249,7 +252,7 @@ class ElarinCore:
         # Start threads and pygame
         threading.Thread(target=self._voice_updater, daemon=True).start()
         pygame.init()
-        self.screen = pygame.display.set_mode((FRAME_WIDTH, FRAME_HEIGHT))
+        self.screen = pygame.display.set_mode((FRAME_WIDTH*2, FRAME_HEIGHT))
         self.clock  = pygame.time.Clock()
         self.percepts = []
         threading.Thread(target=self._audio_loop, daemon=True).start()
@@ -318,6 +321,8 @@ class ElarinCore:
                         m.vector  = vectorize_moment(m)
                     if m.spectrum is None:
                         m.spectrum = compute_audio_signature(m.percepts['audio'], fs=self.fs, bands=8)
+                    if not hasattr(m, 'predictive_value'):
+                        m.predictive_value = 0.5
                 print(f"[Memory-Load] Restored {len(mem.moments)} moments")
                 return mem
             except Exception as e:
@@ -335,11 +340,13 @@ class ElarinCore:
     def _prune_memory(self):
         if self.entropy_max <= self.entropy_min:
             return
+        for m in self.memory.moments:
+            m.predictive_value *= 0.99
         keep = [
             m for m in self.memory.moments
             if (m.state["entropy"] - self.entropy_min) /
                (self.entropy_max - self.entropy_min)
-               >= NORMALIZED_ENTROPY_THRESHOLD
+               >= NORMALIZED_ENTROPY_THRESHOLD and m.predictive_value > 0.2
         ]
         if len(keep) >= max(10, int(0.1 * len(self.memory.moments))):
             self.memory.moments = keep
@@ -347,6 +354,7 @@ class ElarinCore:
     def _predict_next_vec(self, curr_vec):
         if len(self.memory.moments) < 2:
             self.predicted_vec = None
+            self.predicted_moment = None
             return
         neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
         preds = []
@@ -358,8 +366,13 @@ class ElarinCore:
                 continue
         if preds:
             self.predicted_vec = np.mean(preds, axis=0)
+            self.predicted_moment = min(
+                self.memory.moments,
+                key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
+            )
         else:
             self.predicted_vec = None
+            self.predicted_moment = None
 
     def run(self):
         running   = True
@@ -367,9 +380,9 @@ class ElarinCore:
         while running:
             p     = self._sense()
             self._update_state(p)
-            frame = self._imagine(p)
-            self._record(p, frame)
-            self._render(frame)
+            vision, predicted = self._imagine(p)
+            self._record(p, vision)
+            self._render(vision, predicted)
             running = self._handle_events()
             if time.time() - last_save > 30:
                 self._save_memory()
@@ -405,6 +418,9 @@ class ElarinCore:
             diff = np.linalg.norm(curr_vec - self.predicted_vec)
             sat  = max(0.0, 1.0 - diff / 50.0)
             self.state['satisfaction'] = 0.9 * self.state['satisfaction'] + 0.1 * sat
+            if diff < 10 and self.predicted_moment is not None:
+                self.predicted_moment.predictive_value = min(
+                    1.0, self.predicted_moment.predictive_value + 0.05)
         else:
             sat = 0.0
 
@@ -482,11 +498,13 @@ class ElarinCore:
                 dt = max(0.5, (next_m.time - now)) if next_m.time > now else 0.5
                 self._dream_duration     = dt
 
-            return np.clip(blended, 0, 255).astype(np.uint8)
+            frame = np.clip(blended, 0, 255).astype(np.uint8)
+            return frame, frame
 
         # SLEEP MODE
         if self.state['sleeping']:
-            return sleep_pulse(self.memory.moments)
+            frame = sleep_pulse(self.memory.moments)
+            return frame, frame
 
         # AWAKE MODE with salience gating
         sal_cm = cv2.applyColorMap(p['saliency'], cv2.COLORMAP_INFERNO)
@@ -509,12 +527,19 @@ class ElarinCore:
         sal = self.bio.salience  # between 0.0 and 1.0
         vision = sal * raw_vis + (1.0 - sal) * mem_vis
 
-        return np.clip(vision, 0, 255).astype(np.uint8)
+        if self.predicted_moment is not None:
+            pred_vis = self.predicted_moment.expression.astype(np.float32)
+        else:
+            pred_vis = vision
+
+        return (np.clip(vision, 0, 255).astype(np.uint8),
+                np.clip(pred_vis, 0, 255).astype(np.uint8))
 
     def _record(self, p, frame):
         m = Moment(time.time(), p, self.state, frame.copy())
         m.spectrum = compute_audio_signature(p['audio'], fs=self.fs, bands=8)
         m.vector   = vectorize_moment(m)
+        m.predictive_value = 0.5
         e = m.state["entropy"]
         self.entropy_min = min(self.entropy_min, e)
         self.entropy_max = max(self.entropy_max, e)
@@ -525,35 +550,39 @@ class ElarinCore:
         self.memory.add(m)
         print(f"[Memory] #{len(self.memory.moments)} — Entropy: {e:.2f}")
 
-    def _render(self, frame):
+    def _render(self, frame, predicted):
         # Base frame shading and audio tint
         pulse = self.state['pulse_rate']
         phase = (time.time() % pulse) / pulse
         glow  = int(50 + 205 * (1 - abs(phase * 2 - 1)))
-        ov    = np.full_like(frame, glow, np.uint8)
-        bd    = cv2.addWeighted(frame, 0.8, ov, 0.2, 0)
-        bd    = np.clip(bd, 0, 255).astype(np.uint8)
+        def shade(img):
+            ov  = np.full_like(img, glow, np.uint8)
+            bd  = cv2.addWeighted(img, 0.8, ov, 0.2, 0)
+            return np.clip(bd, 0, 255).astype(np.uint8)
+        left  = shade(frame)
+        right = shade(predicted)
 
         # Audio RMS-based tint
         rms = np.sqrt((self.latest_audio ** 2).mean()) if hasattr(self, 'latest_audio') else 0
         if rms > 0.01:
-            tint = np.full_like(bd, (rms * 255, 100, 200), np.uint8)
-            bd   = cv2.addWeighted(bd, 0.95, tint, 0.05, 0)
+            tint_l = np.full_like(left, (rms * 255, 100, 200), np.uint8)
+            left   = cv2.addWeighted(left, 0.95, tint_l, 0.05, 0)
+            tint_r = np.full_like(right, (rms * 255, 100, 200), np.uint8)
+            right  = cv2.addWeighted(right, 0.95, tint_r, 0.05, 0)
 
         # Draw audio activity bar
         bar_h = int(min(1.0, rms * 50) * FRAME_HEIGHT)
-        cv2.rectangle(bd, (10, FRAME_HEIGHT - bar_h), (30, FRAME_HEIGHT), (255, 200, 100), -1)
+        cv2.rectangle(left, (10, FRAME_HEIGHT - bar_h), (30, FRAME_HEIGHT), (255, 200, 100), -1)
 
         # --- NEW: Overlay physiological indicators ---
         # Heart indicator (red circle)
         # Compute a phase [0,1) based on the heart_rate period
         heart_period = self.bio.heart_rate  # seconds per beat
         heart_phase  = (time.time() % heart_period) / heart_period
-        # Triangle‐wave pulse: 1.0 at phase=0.5, 0.8 at phase=0 or 1
         heart_pulse  = 1.0 + 0.2 * (1.0 - abs(heart_phase * 2.0 - 1.0))
         base_radius  = 15
         radius_h     = int(base_radius * heart_pulse)
-        cv2.circle(bd, (30, 30), radius_h, (0, 0, 255), -1)
+        cv2.circle(left, (30, 30), radius_h, (0, 0, 255), -1)
 
         # Lung indicator (blue circle)
         # Compute breath cycle period and phase
@@ -563,12 +592,14 @@ class ElarinCore:
         max_period     = 5.0    # slowest realistic breath: 1 breath per 5s (12 bpm)
         breath_period  = min(max_period, max(min_period, raw_period))
         breath_phase  = (time.time() % breath_period) / breath_period
-        # Triangle-wave pulse: peaks mid–cycle, troughs at cycle ends
         breath_pulse  = 1.0 + 0.2 * (1.0 - abs(breath_phase * 2.0 - 1.0))
         base_radius   = 15
         radius_l      = int(base_radius * breath_pulse)
-        cv2.circle(bd, (70, 30), radius_l, (255, 0, 0), -1)
+        cv2.circle(left, (70, 30), radius_l, (255, 0, 0), -1)
         # -------------------------------------------------
+
+        # Combine left and right panels
+        bd = np.concatenate([left, right], axis=1)
 
         # Convert to RGB and blit via pygame
         try:
