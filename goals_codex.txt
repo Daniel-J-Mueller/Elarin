@@ -1,0 +1,28 @@
+# goals_codex.txt
+# Suggestions for low-hanging fruit tasks to advance Elarin toward an experiential AI
+
+1. **Finalize BioState integration**
+   - Connect the existing `BioState` class to more parts of the system by passing its `salience` value into layers 2–5.
+   - Display visual heart/lung feedback using `get_pulse_scale()` and `get_breath_scale()` for simple animation.
+
+2. **Salience Filtering**
+   - Implement gating of layer inputs based on `BioState.salience`.
+   - Start with a simple rule: if salience < 0.3, weight memory-based predictions higher; otherwise, prioritize current perception.
+
+3. **Feature Association**
+   - Use `vectorize_moment()` and cosine similarity to link new moments to recent ones.
+   - Apply a basic Hebbian update by incrementing association strength when two moments are close in time and feature space.
+
+4. **Sequence Patterning**
+   - Track short token sequences (e.g., last 3–5 vectors) in a list and count occurrences.
+   - When a familiar sequence repeats, raise an expectation of the next token and log it.
+
+5. **Memory Pruning & Persistence**
+   - Use the provided `_prune_memory` and `_save_memory` utilities to periodically persist moments to disk.
+   - Keep only higher-entropy or recent moments to conserve memory without limiting growth dramatically.
+
+6. **Dream Mode Toggle**
+   - Expose a simple method `toggle_dream()` in `ElarinCore` to enter/exit dream mode.
+   - Use the existing `_build_dream_playlist` to replay recent high-salience memories when dreaming.
+
+These steps require only light modifications to the current codebase and provide building blocks for more complex experiential behavior.
