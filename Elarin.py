@@ -18,6 +18,11 @@ DECAY_FACTOR = 300.0  # seconds for recency weighting
 NORMALIZED_ENTROPY_THRESHOLD = 0.5
 REPULSION_FACTOR = 0.5  # for dream-mode deviation
 
+# Boredom & prediction parameters
+BORING_DELTA = 1.0
+BOREDOM_THRESHOLD = 5.0
+SLEEP_BOREDOM_THRESHOLD = 10.0
+
 def compute_audio_signature(audio, fs=16000, bands=8):
     fft = np.abs(np.fft.rfft(audio))
     freqs = np.fft.rfftfreq(len(audio), d=1/fs)
@@ -59,7 +64,8 @@ def ElarinState():
         "pulse_rate": 1.5,
         "restfulness": 0.0,
         "sleeping": False,
-        "last_active": time.time()
+        "boredom": 0.0,
+        "satisfaction": 0.0
     }
 
 class BioState:
@@ -107,20 +113,6 @@ class BioState:
         # Normalize breath_rate from [0.1, 1.0] → scale [0.8, 1.2]
         return 0.8 + (self.breath_rate - 0.1) * (0.4 / 0.9)
 
-class Pacifier:
-    def __init__(self, state): self.state = state
-    def soothe(self, duration=30):
-        s_e, s_p, s_r = self.state["entropy"], self.state["pulse_rate"], self.state["restfulness"]
-        t_e, t_p, t_r = 0.0, max(MIN_HEARTBEAT, 2.0), 1.0
-        t0 = time.time()
-        def fade():
-            f = min((time.time() - t0) / duration, 1.0)
-            self.state["entropy"]     = s_e * (1-f) + t_e * f
-            self.state["pulse_rate"]  = max(MIN_HEARTBEAT, s_p * (1-f) + t_p * f)
-            self.state["restfulness"] = s_r * (1-f) + t_r * f
-            if f < 1.0:
-                threading.Timer(1.0, fade).start()
-        fade()
 
 class Moment:
     def __init__(self, timestamp, percepts, state, expression):
@@ -173,10 +165,8 @@ def estimate_entropy(state, percepts):
 def entropy_to_heartbeat(e):
     return max(MIN_HEARTBEAT, min(2.0, 2.0 - e/50))
 
-def should_sleep(state, percepts):
-    return (state["entropy"] < 5.0 and
-            state["restfulness"] > 0.9 and
-            (time.time() - state["last_active"]) > 10)
+def should_sleep(state):
+    return state.get("boredom", 0.0) > SLEEP_BOREDOM_THRESHOLD
 
 def should_wake(state, percepts):
     if len(percepts) < 2: return False
@@ -240,9 +230,13 @@ class ElarinCore:
         self.entropy_max = float("-inf")
         self.memory = self._load_memory()
 
-        # Vision & pacifier
+        # Prediction and boredom tracking
+        self.prev_entropy = self.state["entropy"]
+        self.predicted_vec = None
+        self.bored_start = None
+
+        # Vision feed
         self.vision = VisionFeed()
-        self.pacifier = Pacifier(self.state)
 
         # Dream variables
         self.dreaming = False
@@ -350,6 +344,23 @@ class ElarinCore:
         if len(keep) >= max(10, int(0.1 * len(self.memory.moments))):
             self.memory.moments = keep
 
+    def _predict_next_vec(self, curr_vec):
+        if len(self.memory.moments) < 2:
+            self.predicted_vec = None
+            return
+        neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
+        preds = []
+        for m in neighbors:
+            try:
+                idx = self.memory.moments.index(m)
+                preds.append(self.memory.moments[idx+1].vector)
+            except (ValueError, IndexError):
+                continue
+        if preds:
+            self.predicted_vec = np.mean(preds, axis=0)
+        else:
+            self.predicted_vec = None
+
     def run(self):
         running   = True
         last_save = time.time()
@@ -380,12 +391,45 @@ class ElarinCore:
         self.state['pulse_rate'] = entropy_to_heartbeat(self.state['entropy'])
         
         # Sleep/Wake logic
-        if not self.state['sleeping'] and should_sleep(self.state, self.percepts):
+        if not self.state['sleeping'] and should_sleep(self.state):
             self.state['sleeping'] = True
         elif self.state['sleeping'] and should_wake(self.state, self.percepts):
-            self.state['sleeping']    = False
-            self.state['last_active'] = time.time()
-        
+            self.state['sleeping'] = False
+
+        # Vectorize current percept
+        temp_m = Moment(time.time(), p, self.state, np.zeros((1,1,3), np.uint8))
+        curr_vec = vectorize_moment(temp_m)
+
+        # Satisfaction from prediction accuracy
+        if self.predicted_vec is not None:
+            diff = np.linalg.norm(curr_vec - self.predicted_vec)
+            sat  = max(0.0, 1.0 - diff / 50.0)
+            self.state['satisfaction'] = 0.9 * self.state['satisfaction'] + 0.1 * sat
+        else:
+            sat = 0.0
+
+        # Boredom from low entropy change
+        d_ent = abs(self.state['entropy'] - self.prev_entropy)
+        if d_ent < BORING_DELTA:
+            self.state['boredom'] += 0.1
+        else:
+            self.state['boredom'] = max(0.0, self.state['boredom'] - 0.05)
+        self.prev_entropy = self.state['entropy']
+        if self.state['satisfaction'] > 0.8:
+            self.state['boredom'] = max(0.0, self.state['boredom'] - 0.2)
+
+        # Dreaming triggered by boredom
+        if self.state['boredom'] > BOREDOM_THRESHOLD and not self.dreaming and not self.state['sleeping']:
+            self.dreaming = True
+            self._dream_buffer = None
+            self._dream_playlist = None
+        elif self.dreaming and self.state['boredom'] <= BOREDOM_THRESHOLD:
+            self.dreaming = False
+            self._dream_current = None
+
+        # Predict next vector
+        self._predict_next_vec(curr_vec)
+
         # Update restfulness
         update_biological_state(self.state)
         
@@ -539,22 +583,7 @@ class ElarinCore:
         for ev in pygame.event.get():
             if ev.type==pygame.QUIT:
                 return False
-            if ev.type==pygame.KEYDOWN:
-                self.state["last_active"]=time.time()
-                if ev.key==pygame.K_SPACE:
-                    self.pacifier.soothe()
-                    print(f"[Pacifier] Entropy: {self.state['entropy']:.2f}")
-                elif ev.key==pygame.K_s:
-                    self.pacifier.soothe(duration=30)
-                    print("[Manual soothe]")
-                elif ev.key==pygame.K_d:
-                    self.dreaming = not self.dreaming
-                    if self.dreaming:
-                        self._dream_buffer     = None
-                        self._dream_playlist   = None
-                    else:
-                        self._dream_current    = None
-                    print("[Dream Mode]" if self.dreaming else "[Live Mode]")
+            # User-driven state changes are disabled
         return True
 
     def _audio_loop(self):
