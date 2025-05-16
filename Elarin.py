@@ -263,6 +263,8 @@ class ElarinCore:
     def _build_dream_playlist(self, buffer):
         # iterative repulsion-based sampling
         playlist = []
+        if not buffer:
+            return playlist
         # seed: highest entropy
         seed = max(buffer, key=lambda m: m.state["entropy"])
         playlist.append(seed)
@@ -409,6 +411,10 @@ class ElarinCore:
                 # build playlist
                 self._dream_playlist = self._build_dream_playlist(buf)
                 self._dream_index    = 0
+                if not self._dream_playlist:
+                    self.dreaming = False
+                    self._dream_buffer = None
+                    return p['video']
                 # initialize prev and target images
                 init_expr = p['video'].astype(np.float32)
                 self._dream_prev_image   = init_expr.copy()
