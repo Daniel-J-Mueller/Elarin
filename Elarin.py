@@ -9,10 +9,13 @@ import pygame
 import pickle
 import os
 import random
+import sys
+import json
 
 FRAME_WIDTH, FRAME_HEIGHT = 640, 480
 AUDIO_SAMPLE_DURATION = 0.1
 MEMORY_FILE = "elarin_memory.pkl"
+INFO_FILE = "elarin_info.json"
 MIN_HEARTBEAT = 0.8
 DECAY_FACTOR = 300.0  # seconds for recency weighting
 NORMALIZED_ENTROPY_THRESHOLD = 0.5
@@ -231,6 +234,9 @@ class ElarinCore:
         self.entropy_min = float("inf")
         self.entropy_max = float("-inf")
         self.memory = self._load_memory()
+        self.session_start = time.time()
+        self.overall_start = self._load_info()
+        self.last_status_time = 0
 
         # Prediction and boredom tracking
         self.prev_entropy = self.state["entropy"]
@@ -330,6 +336,20 @@ class ElarinCore:
                 print("[Memory-Load-Error]", e)
         return MemoryBank()
 
+    def _load_info(self):
+        if os.path.exists(INFO_FILE):
+            try:
+                data = json.load(open(INFO_FILE, 'r'))
+                return data.get('overall_start', time.time())
+            except Exception as e:
+                print('[Info-Load-Error]', e)
+        start = time.time()
+        try:
+            json.dump({'overall_start': start}, open(INFO_FILE, 'w'))
+        except Exception as e:
+            print('[Info-Save-Error]', e)
+        return start
+
     def _save_memory(self):
         def _s():
             try:
@@ -337,6 +357,23 @@ class ElarinCore:
             except:
                 pass
         threading.Thread(target=_s, daemon=True).start()
+
+    def _update_status(self):
+        now = time.time()
+        if now - self.last_status_time < 1.0:
+            return
+        self.last_status_time = now
+        mem_count = len(self.memory.moments)
+        mem_size = os.path.getsize(MEMORY_FILE) if os.path.exists(MEMORY_FILE) else 0
+        sess = now - self.session_start
+        overall = now - self.overall_start
+        status = (
+            f"[Status] Memories: {mem_count} | "
+            f"Mem Size: {mem_size/1024:.1f} KB | "
+            f"Session: {sess:.1f}s | Overall: {overall:.1f}s"
+        )
+        sys.stdout.write('\r' + status + ' ' * 10)
+        sys.stdout.flush()
 
     def _prune_memory(self):
         if self.entropy_max <= self.entropy_min:
@@ -557,7 +594,7 @@ class ElarinCore:
         if len(self.memory.moments)>=self.memory.maxlen:
             self.memory.moments.pop(0)
         self.memory.add(m)
-        print(f"[Memory] #{len(self.memory.moments)} — Entropy: {e:.2f}")
+        self._update_status()
 
     def _render(self, frame, predicted):
         # Base frame shading and audio tint
