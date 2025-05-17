@@ -244,6 +244,8 @@ class ElarinCore:
         self.predicted_moment = None
         self.predicted_delta = None
         self.bored_start = None
+        # Queue of prediction frames awaiting comparison
+        self.pending_diffs = []
 
         # Vision feed
         self.vision = VisionFeed()
@@ -398,13 +400,13 @@ class ElarinCore:
             return
         neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
         preds = []
-        deltas = []
+        dts = []
         for m in neighbors:
             try:
                 idx = self.memory.moments.index(m)
                 next_m = self.memory.moments[idx+1]
                 preds.append(next_m.vector)
-                deltas.append(next_m.time - m.time)
+                dts.append(next_m.time - m.time)
             except (ValueError, IndexError):
                 continue
         if preds:
@@ -413,7 +415,13 @@ class ElarinCore:
                 self.memory.moments,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
-            self.predicted_delta = float(np.mean(deltas)) if deltas else None
+            dt = float(np.mean(dts)) if dts else 0.5
+            pred_time = time.time() + max(0.1, dt)
+            self.pending_diffs.append({
+                'time': pred_time,
+                'frame': self.predicted_moment.expression.copy()
+            })
+            self.pending_diffs.sort(key=lambda x: x['time'])
         else:
             self.predicted_vec = None
             self.predicted_moment = None
@@ -631,7 +639,24 @@ class ElarinCore:
         self.memory.add(m)
         self._update_status()
 
+    def _consume_prediction_diffs(self, current_frame):
+        """Return an overlay showing prediction errors due at this time."""
+        now = time.time()
+        ready = [p for p in self.pending_diffs if p['time'] <= now]
+        self.pending_diffs = [p for p in self.pending_diffs if p['time'] > now]
+        if not ready:
+            return np.zeros_like(current_frame)
+        overlay = np.zeros_like(current_frame)
+        alpha = 1.0 / len(ready)
+        for item in ready:
+            diff = cv2.absdiff(current_frame, item['frame'])
+            overlay = cv2.addWeighted(overlay, 1.0, diff, alpha, 0)
+        return overlay
+
     def _render(self, frame, predicted):
+        # Generate difference overlay for pending predictions
+        diff_panel_raw = self._consume_prediction_diffs(frame)
+
         # Base frame shading and audio tint
         # Use a fixed overlay brightness to avoid pulsing/flashing
         glow = 128
@@ -641,6 +666,11 @@ class ElarinCore:
             return np.clip(bd, 0, 255).astype(np.uint8)
         left  = shade(frame)
         right = shade(predicted)
+        if self.pending_diffs:
+            dt = self.pending_diffs[0]['time'] - time.time()
+            cv2.putText(right, f"{dt:.1f}s", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2,
+                        cv2.LINE_AA)
 
         # Audio RMS-based tint
         rms = np.sqrt((self.latest_audio ** 2).mean()) if hasattr(self, 'latest_audio') else 0
@@ -690,11 +720,11 @@ class ElarinCore:
 
         # Imagination panel (bottom left) and empty panel (bottom right)
         imagination = shade(self._get_imagination_frame())
-        empty = np.zeros_like(imagination)
+        diff_panel = shade(diff_panel_raw)
 
         # Build 2x2 grid
         top_row = np.concatenate([left, right], axis=1)
-        bottom_row = np.concatenate([imagination, empty], axis=1)
+        bottom_row = np.concatenate([imagination, diff_panel], axis=1)
         bd = np.concatenate([top_row, bottom_row], axis=0)
 
         # Convert to RGB and blit via pygame
