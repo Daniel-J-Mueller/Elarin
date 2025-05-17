@@ -242,7 +242,6 @@ class ElarinCore:
         self.prev_entropy = self.state["entropy"]
         self.predicted_vec = None
         self.predicted_moment = None
-        self.predicted_delta = None
         self.bored_start = None
         # Queue of prediction frames awaiting comparison
         self.pending_diffs = []
@@ -396,7 +395,6 @@ class ElarinCore:
         if len(self.memory.moments) < 2:
             self.predicted_vec = None
             self.predicted_moment = None
-            self.predicted_delta = None
             return
         neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
         preds = []
@@ -415,8 +413,8 @@ class ElarinCore:
                 self.memory.moments,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
-            self.predicted_delta = max(0.1, float(np.mean(dts)) if dts else 0.5)
-            pred_time = time.time() + self.predicted_delta
+            predicted_delta = max(0.1, float(np.mean(dts)) if dts else 0.5)
+            pred_time = time.time() + predicted_delta
             self.pending_diffs.append({
                 'time': pred_time,
                 'frame': self.predicted_moment.expression.copy(),
@@ -426,7 +424,6 @@ class ElarinCore:
         else:
             self.predicted_vec = None
             self.predicted_moment = None
-            self.predicted_delta = None
 
     def _get_imagination_frame(self):
         """Return a frame from memory representing Elarin's imagination.
@@ -680,11 +677,6 @@ class ElarinCore:
             return np.clip(bd, 0, 255).astype(np.uint8)
         left  = shade(frame)
         right = shade(predicted)
-        if self.pending_diffs:
-            dt = self.pending_diffs[0]['time'] - time.time()
-            cv2.putText(right, f"{dt:.1f}s", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2,
-                        cv2.LINE_AA)
 
         # Audio RMS-based tint
         rms = np.sqrt((self.latest_audio ** 2).mean()) if hasattr(self, 'latest_audio') else 0
@@ -722,9 +714,11 @@ class ElarinCore:
         cv2.circle(left, (70, 30), radius_l, (255, 0, 0), -1)
         # -------------------------------------------------
 
-        # Overlay prediction lead time on the predicted frame
-        if self.predicted_delta is not None:
-            text = f"{self.predicted_delta:.2f}s"
+
+        # Only one timestamp: countdown to the next prediction
+        if self.pending_diffs:
+            dt = self.pending_diffs[0]['time'] - time.time()
+            text = f"{dt:.1f}s"
             font = cv2.FONT_HERSHEY_SIMPLEX
             scale = 0.6
             thick = 1
