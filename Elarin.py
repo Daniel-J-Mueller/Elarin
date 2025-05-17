@@ -227,17 +227,23 @@ class ObjectMemory:
     velocity: tuple = field(default_factory=lambda: (0.0, 0.0))
     group_id: int = None
     merge_scores: dict = field(default_factory=dict)
+    positions: list = field(default_factory=list)
+    motion: float = 0.0
 
-    def update(self, bbox, hist, image):
+    def update(self, bbox, hist, image, motion_level=0.0):
         x, y, w, h = bbox
         cx, cy = x + w / 2.0, y + h / 2.0
         vx = cx - self.center[0]
         vy = cy - self.center[1]
         self.velocity = (vx, vy)
         self.center = (cx, cy)
+        self.positions.append((cx, cy))
+        if len(self.positions) > 5:
+            self.positions.pop(0)
         self.hist = (self.hist * self.count + hist) / (self.count + 1)
         self.bbox = bbox
         self.image = cv2.resize(image, (32, 32)) if image is not None else self.image
+        self.motion = 0.5 * self.motion + 0.5 * float(motion_level)
         self.count += 1
 
 class VisionFeed:
@@ -499,6 +505,11 @@ class ElarinCore:
                             obj.group_id = obj.id
                         if not hasattr(obj, 'merge_scores'):
                             obj.merge_scores = {}
+                        if not hasattr(obj, 'positions'):
+                            x, y, w, h = obj.bbox
+                            obj.positions = [(x + w/2.0, y + h/2.0)]
+                        if not hasattr(obj, 'motion'):
+                            obj.motion = 0.0
                         objs.append(obj)
                 except Exception as e:
                     print('[Obj-Memory-Load-Error]', e)
@@ -877,7 +888,7 @@ class ElarinCore:
                     m.expression = blended
         return overlay
 
-    def _merge_objects(self, a, b):
+    def _merge_object_pair(self, a, b):
         x1, y1, w1, h1 = a.bbox
         x2, y2, w2, h2 = b.bbox
         nx = min(x1, x2)
@@ -902,12 +913,8 @@ class ElarinCore:
     def _update_objects(self, p):
         motion = p['motion']
         _, mask = cv2.threshold(motion, 30, 255, cv2.THRESH_BINARY)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for cnt in contours:
-            if cv2.contourArea(cnt) < 800:
-                continue
-            x,y,w,h = cv2.boundingRect(cnt)
 
         detections = []
         for cnt in contours:
@@ -918,66 +925,36 @@ class ElarinCore:
             if obj_img.size == 0:
                 continue
             hsv = cv2.cvtColor(obj_img, cv2.COLOR_BGR2HSV)
-            hist = cv2.calcHist([hsv], [0,1], None, [8,8], [0,180,0,256])
+            hist = cv2.calcHist([hsv], [0, 1], None, [8, 8], [0, 180, 0, 256])
             cv2.normalize(hist, hist)
             hist = hist.flatten()
-            match = None
-            best = 1.0
-            for mem in self.object_memories:
-                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
-                if score < best:
-                    best = score
-                    match = mem
-            if match is not None and best < 0.3:
-                match.hist = (match.hist * match.count + hist) / (match.count + 1)
-                match.count += 1
-                match.bbox = (x,y,w,h)
-                match.image = cv2.resize(obj_img, (32,32))
-            else:
-                oid = self.object_id_counter
-                self.object_id_counter += 1
-                mem = ObjectMemory(oid, hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
-                self.object_memories.append(mem)
-
-    def _render(self, percept, frame, predicted):
-            detections.append({'bbox': (x,y,w,h), 'hist': hist.flatten(), 'img': obj_img})
+            mlevel = mask[y:y+h, x:x+w].mean() / 255.0
+            detections.append({'bbox': (x, y, w, h), 'hist': hist, 'img': obj_img, 'motion': mlevel})
 
         for det in detections:
-            x,y,w,h = det['bbox']
-            cx, cy = x + w/2.0, y + h/2.0
+            x, y, w, h = det['bbox']
+            cx, cy = x + w / 2.0, y + h / 2.0
             best = None
-            best_score = 1e9
-            hist = hist.flatten()
-            center = (x + w/2.0, y + h/2.0)
-            match = None
-            best = 999.0
-            for mem in self.object_memories:
-                dist = np.linalg.norm(np.array(mem.positions[-1]) - np.array(center)) if mem.positions else 999.0
-                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
-                total = score + dist/100.0
-                if total < best and dist < 100:
-                    best = total
-                    match = mem
-            if match is not None and best < 0.5:
-                match.update(hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
-            match = None
-            best = 1.0
+            best_score = float('inf')
             for mem in self.object_memories:
                 hist_score = cv2.compareHist(mem.hist.astype(np.float32), det['hist'].astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
-                dist = np.hypot(mem.center[0]-cx, mem.center[1]-cy)
-                score = hist_score + dist/100.0
+                dist = np.hypot(mem.center[0] - cx, mem.center[1] - cy)
+                score = hist_score + dist / 100.0
                 if score < best_score:
                     best_score = score
                     best = mem
             if best is not None and best_score < 0.6:
-                best.update(det['bbox'], det['hist'], det['img'])
+                best.update((x, y, w, h), det['hist'], det['img'], det['motion'])
             else:
                 oid = self.object_id_counter
                 self.object_id_counter += 1
-                mem = ObjectMemory(oid, det['hist'], det['bbox'], cv2.resize(det['img'], (32,32)))
+                mem = ObjectMemory(oid, det['hist'], det['bbox'], cv2.resize(det['img'], (32, 32)))
                 mem.center = (cx, cy)
+                mem.positions = [(cx, cy)]
+                mem.motion = det['motion']
                 mem.group_id = oid
                 self.object_memories.append(mem)
+
         self._merge_objects()
 
     def _merge_objects(self):
@@ -1034,10 +1011,10 @@ class ElarinCore:
                 a.merge_scores[b.id] = score
                 b.merge_scores[a.id] = score
                 if score >= 5:
-                    self._merge_objects(a, b)
+                    self._merge_object_pair(a, b)
                     return  # restart after merge to avoid index errors
 
-    def _render(self, frame, predicted):
+    def _render(self, percept, frame, predicted):
         # Update prediction history and compute immediate diff panel
         self._consume_prediction_diffs(frame)
         diff_panel_raw = cv2.absdiff(frame, predicted)
