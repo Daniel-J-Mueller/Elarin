@@ -261,6 +261,16 @@ class ElarinCore:
         # Vision feed
         self.vision = VisionFeed()
 
+        # Dream mode state
+        self.dreaming = False
+        self._dream_buffer = None
+        self._dream_playlist = []
+        self._dream_index = 0
+        self._dream_frame_target = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.float32)
+        self._dream_last_switch = 0.0
+        self._dream_duration = 0.0
+        self._dream_prev_image = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.float32)
+
 
         # Imagination panel tracking
         self._imagination_frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
