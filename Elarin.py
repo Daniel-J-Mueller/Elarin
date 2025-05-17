@@ -645,13 +645,13 @@ class ElarinCore:
             self.predicted_delta = None
 
     def _get_imagination_frame(self):
-        """Return a frame from memory representing Elarin's imagination.
+        """Return the current imagination frame.
 
-        This implementation no longer references the current camera input.  It
-        selects frames solely from the memory bank with a bias toward recent
-        memories.  Memories newer than five seconds receive a linear dampening
-        so the imagination does not simply mirror the present moment.
-        """
+        The imagination now starts from the latest camera frame blurred to a
+        low resolution. A randomly selected memory frame is lightly blended in
+        so the scene can drift from the present. Tracked objects are drawn at
+        predicted positions based on their last observed velocity. The frame is
+        rebuilt every call so previous objects do not accumulate."""
 
         now = time.time()
 
@@ -691,45 +691,49 @@ class ElarinCore:
             return self._imagination_frame
         self._imagination_last = now
 
-        if not self.memory.moments:
+        if not self.percepts:
             self._imagination_frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
             return self._imagination_frame
 
-        # Build weighted choices based solely on memory recency
-        ages = np.array([now - m.time for m in self.memory.moments])
-        weights = np.exp(-ages / DECAY_FACTOR)
-
-        # Dampen very recent memories so imagination drifts away from the present
-        recent_mask = ages < 5.0
-        weights[recent_mask] *= ages[recent_mask] / 5.0
-
-        total = weights.sum()
-        if total <= 0:
-            chosen = random.choice(self.memory.moments)
-        else:
-            probs = weights / total
-            idx = np.random.choice(len(self.memory.moments), p=probs)
-            chosen = self.memory.moments[idx]
-
-        base = chosen.expression.copy()
-        small = cv2.resize(base, (FRAME_WIDTH//16, FRAME_HEIGHT//16), interpolation=cv2.INTER_LINEAR)
+        # Start from the latest camera frame at very low resolution
+        cam = self.percepts[-1]['video']
+        small = cv2.resize(cam, (FRAME_WIDTH//16, FRAME_HEIGHT//16), interpolation=cv2.INTER_LINEAR)
         img = cv2.resize(small, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_NEAREST)
+
+        # Blend in a memory frame so imagination can diverge from the present
+        if self.memory.moments:
+            ages = np.array([now - m.time for m in self.memory.moments])
+            weights = np.exp(-ages / DECAY_FACTOR)
+            recent_mask = ages < 5.0
+            weights[recent_mask] *= ages[recent_mask] / 5.0
+            total = weights.sum()
+            if total > 0:
+                probs = weights / total
+                idx = np.random.choice(len(self.memory.moments), p=probs)
+                chosen = self.memory.moments[idx]
+                mem_small = cv2.resize(chosen.expression, (FRAME_WIDTH//16, FRAME_HEIGHT//16), interpolation=cv2.INTER_LINEAR)
+                mem_lr = cv2.resize(mem_small, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_NEAREST)
+                img = cv2.addWeighted(img, 0.7, mem_lr, 0.3, 0)
+
+        # Draw moving objects at predicted next positions
         for obj in self.object_memories:
             if obj.count < 2 or obj.image is None:
                 continue
             x, y, w, h = obj.bbox
-            x = max(0, min(FRAME_WIDTH-1, x))
-            y = max(0, min(FRAME_HEIGHT-1, y))
-            w = max(1, min(FRAME_WIDTH - x, w))
-            h = max(1, min(FRAME_HEIGHT - y, h))
+            vx, vy = obj.velocity
+            px = int(round(x + vx))
+            py = int(round(y + vy))
+            px = max(0, min(FRAME_WIDTH - w, px))
+            py = max(0, min(FRAME_HEIGHT - h, py))
             overlay = cv2.resize(obj.image, (w, h))
             mask = cv2.resize(obj.mask, (w, h), interpolation=cv2.INTER_NEAREST) if obj.mask is not None else np.ones((h, w), np.uint8)*255
-            roi = img[y:y+h, x:x+w]
+            roi = img[py:py+h, px:px+w]
             alpha = (mask / 255.0)[..., None]
-            img[y:y+h, x:x+w] = roi * (1 - alpha) + overlay * alpha
+            img[py:py+h, px:px+w] = roi * (1 - alpha) + overlay * alpha
             if self.debug_objects:
-                contours,_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                cv2.drawContours(img[y:y+h, x:x+w], contours, -1, (255,0,0), 1)
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(img[py:py+h, px:px+w], contours, -1, (255,0,0), 1)
+
         self._imagination_frame = img
         return self._imagination_frame
 
