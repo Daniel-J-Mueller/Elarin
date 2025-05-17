@@ -11,7 +11,7 @@ import os
 import random
 import sys
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 FRAME_WIDTH, FRAME_HEIGHT = 640, 480
 AUDIO_SAMPLE_DURATION = 0.1
@@ -142,13 +142,29 @@ class MemoryBank:
         if len(self.moments) > self.maxlen:
             self.moments.pop(0)
 
+@dataclass
 class ObjectMemory:
-    def __init__(self, obj_id, hist, bbox, image):
-        self.id = obj_id
-        self.hist = hist
-        self.bbox = bbox  # (x, y, w, h)
-        self.image = image
-        self.count = 1
+    id: int
+    hist: np.ndarray
+    bbox: tuple  # (x, y, w, h)
+    image: np.ndarray
+    count: int = 1
+    center: tuple = field(default_factory=lambda: (0.0, 0.0))
+    velocity: tuple = field(default_factory=lambda: (0.0, 0.0))
+    group_id: int = None
+    merge_scores: dict = field(default_factory=dict)
+
+    def update(self, bbox, hist, image):
+        x, y, w, h = bbox
+        cx, cy = x + w / 2.0, y + h / 2.0
+        vx = cx - self.center[0]
+        vy = cy - self.center[1]
+        self.velocity = (vx, vy)
+        self.center = (cx, cy)
+        self.hist = (self.hist * self.count + hist) / (self.count + 1)
+        self.bbox = bbox
+        self.image = cv2.resize(image, (32, 32)) if image is not None else self.image
+        self.count += 1
 
 class VisionFeed:
     def __init__(self, cam_index=0):
@@ -287,6 +303,7 @@ class ElarinCore:
         # Imagination panel tracking
         self._imagination_frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
         self._imagination_last = 0.0
+        self.debug_objects = True
 
         # Start threads and pygame
         threading.Thread(target=self._voice_updater, daemon=True).start()
@@ -356,6 +373,15 @@ class ElarinCore:
                 try:
                     with open(path, 'rb') as f:
                         obj = pickle.load(f)
+                        if not hasattr(obj, 'center'):
+                            x, y, w, h = obj.bbox
+                            obj.center = (x + w/2.0, y + h/2.0)
+                        if not hasattr(obj, 'velocity'):
+                            obj.velocity = (0.0, 0.0)
+                        if not hasattr(obj, 'group_id'):
+                            obj.group_id = obj.id
+                        if not hasattr(obj, 'merge_scores'):
+                            obj.merge_scores = {}
                         objs.append(obj)
                 except Exception as e:
                     print('[Obj-Memory-Load-Error]', e)
@@ -517,8 +543,8 @@ class ElarinCore:
                 self._dream_duration = dt
             return frame
 
-        # throttle imagination updates to ~2 Hz
-        if now - self._imagination_last < 0.5:
+        # throttle imagination updates to ~15 FPS (approx half realtime)
+        if now - self._imagination_last < 0.066:
             return self._imagination_frame
         self._imagination_last = now
 
@@ -557,6 +583,8 @@ class ElarinCore:
             overlay = cv2.resize(obj.image, (w,h))
             roi = img[y:y+h, x:x+w]
             img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
+            if self.debug_objects:
+                cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 1)
         self._imagination_frame = img
         return self._imagination_frame
 
@@ -720,39 +748,84 @@ class ElarinCore:
                     m.expression = blended
         return overlay
 
+    def _merge_objects(self, a, b):
+        x1, y1, w1, h1 = a.bbox
+        x2, y2, w2, h2 = b.bbox
+        nx = min(x1, x2)
+        ny = min(y1, y2)
+        nx2 = max(x1 + w1, x2 + w2)
+        ny2 = max(y1 + h1, y2 + h2)
+        a.bbox = (nx, ny, nx2 - nx, ny2 - ny)
+        a.hist = (a.hist * a.count + b.hist * b.count) / (a.count + b.count)
+        a.count += b.count
+        a.center = ((a.center[0] + b.center[0]) / 2.0,
+                    (a.center[1] + b.center[1]) / 2.0)
+        a.velocity = ((a.velocity[0] + b.velocity[0]) / 2.0,
+                      (a.velocity[1] + b.velocity[1]) / 2.0)
+        a.group_id = a.group_id if a.group_id is not None else a.id
+        b_gid = b.group_id if b.group_id is not None else b.id
+        if b_gid != a.group_id:
+            a.group_id = min(a.group_id, b_gid)
+        self.object_memories.remove(b)
+        for obj in self.object_memories:
+            obj.merge_scores.pop(b.id, None)
+
     def _update_objects(self, p):
         motion = p['motion']
         _, mask = cv2.threshold(motion, 30, 255, cv2.THRESH_BINARY)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        detections = []
         for cnt in contours:
             if cv2.contourArea(cnt) < 800:
                 continue
-            x,y,w,h = cv2.boundingRect(cnt)
+            x, y, w, h = cv2.boundingRect(cnt)
             obj_img = p['video'][y:y+h, x:x+w]
             if obj_img.size == 0:
                 continue
             hsv = cv2.cvtColor(obj_img, cv2.COLOR_BGR2HSV)
             hist = cv2.calcHist([hsv], [0,1], None, [8,8], [0,180,0,256])
             cv2.normalize(hist, hist)
-            hist = hist.flatten()
-            match = None
-            best = 1.0
+            detections.append({'bbox': (x,y,w,h), 'hist': hist.flatten(), 'img': obj_img})
+
+        for det in detections:
+            x,y,w,h = det['bbox']
+            cx, cy = x + w/2.0, y + h/2.0
+            best = None
+            best_score = 1e9
             for mem in self.object_memories:
-                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
-                if score < best:
-                    best = score
-                    match = mem
-            if match is not None and best < 0.3:
-                match.hist = (match.hist * match.count + hist) / (match.count + 1)
-                match.count += 1
-                match.bbox = (x,y,w,h)
-                match.image = cv2.resize(obj_img, (32,32))
+                hist_score = cv2.compareHist(mem.hist.astype(np.float32), det['hist'].astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
+                dist = np.hypot(mem.center[0]-cx, mem.center[1]-cy)
+                score = hist_score + dist/100.0
+                if score < best_score:
+                    best_score = score
+                    best = mem
+            if best is not None and best_score < 0.6:
+                best.update(det['bbox'], det['hist'], det['img'])
             else:
                 oid = self.object_id_counter
                 self.object_id_counter += 1
-                mem = ObjectMemory(oid, hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
+                mem = ObjectMemory(oid, det['hist'], det['bbox'], cv2.resize(det['img'], (32,32)))
+                mem.center = (cx, cy)
+                mem.group_id = oid
                 self.object_memories.append(mem)
+
+        # Merge objects that move similarly
+        for i in range(len(self.object_memories)):
+            a = self.object_memories[i]
+            for j in range(i+1, len(self.object_memories)):
+                b = self.object_memories[j]
+                dv = np.hypot(a.velocity[0]-b.velocity[0], a.velocity[1]-b.velocity[1])
+                if dv < 2.0:
+                    score = a.merge_scores.get(b.id, 0) + 1
+                else:
+                    score = max(0, a.merge_scores.get(b.id, 0) - 1)
+                a.merge_scores[b.id] = score
+                b.merge_scores[a.id] = score
+                if score >= 5:
+                    self._merge_objects(a, b)
+                    return  # restart after merge to avoid index errors
 
     def _render(self, frame, predicted):
         # Update prediction history and compute immediate diff panel
