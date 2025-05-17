@@ -592,6 +592,7 @@ class ElarinCore:
             return
         neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
         preds = []
+        pred_moms = []
         dts = []
         # Prediction horizon scales with entropy.  Low entropy → look further
         entropy_norm   = max(0.0, min(1.0, self.state["entropy"] / 100.0))
@@ -606,6 +607,7 @@ class ElarinCore:
                     continue
                 next_m = self.memory.moments[target]
                 preds.append(next_m.vector)
+                pred_moms.append(next_m)
                 dts.append(next_m.time - m.time)
             except (ValueError, IndexError):
                 continue
@@ -613,10 +615,10 @@ class ElarinCore:
         if preds:
             self.predicted_vec = np.mean(preds, axis=0)
             self.predicted_moment = min(
-                self.memory.moments,
+                pred_moms,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
-            predicted_delta = max(1.0, lookahead_sec)
+            predicted_delta = np.mean(dts) if dts else lookahead_sec
             pred_time = time.time() + predicted_delta
             self.pending_diffs.append({
                 'time': pred_time,
@@ -1003,8 +1005,10 @@ class ElarinCore:
 
     def _render(self, percept, frame, predicted):
         # Update prediction history and compute immediate diff panel
-        self._consume_prediction_diffs(frame)
+        diff_history = self._consume_prediction_diffs(frame)
         diff_panel_raw = cv2.absdiff(frame, predicted)
+        if diff_history is not None:
+            diff_panel_raw = cv2.addWeighted(diff_panel_raw, 0.7, diff_history, 0.3, 0)
 
         # Base frame shading and audio tint for everything except the
         # primary camera feed.  The left panel (camera feed) is kept
