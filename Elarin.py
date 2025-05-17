@@ -26,6 +26,9 @@ BORING_DELTA = 1.0
 BOREDOM_THRESHOLD = 5.0
 SLEEP_BOREDOM_THRESHOLD = 10.0
 
+#experiment - blend determinism
+BLEND_DETERMINISM = False
+
 def compute_audio_signature(audio, fs=16000, bands=8):
     fft = np.abs(np.fft.rfft(audio))
     freqs = np.fft.rfftfreq(len(audio), d=1/fs)
@@ -663,6 +666,16 @@ class ElarinCore:
                 if err < 20.0:
                     m = item['moment']
                     m.predictive_value = min(1.0, m.predictive_value + 0.1)
+                if BLEND_DETERMINISM:
+                    m = item['moment']
+                    blended = cv2.addWeighted(
+                        m.expression.astype(np.float32),
+                        0.8,
+                        current_frame.astype(np.float32),
+                        0.2,
+                        0
+                    ).astype(np.uint8)
+                    m.expression = blended
         return overlay
 
     def _render(self, frame, predicted):
