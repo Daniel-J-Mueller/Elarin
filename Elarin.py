@@ -698,29 +698,16 @@ class ElarinCore:
 
         base = chosen.expression.copy()
         small = cv2.resize(base, (FRAME_WIDTH//16, FRAME_HEIGHT//16), interpolation=cv2.INTER_LINEAR)
-        frosted = cv2.resize(small, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_NEAREST)
-        img = frosted
+        img = cv2.resize(small, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_NEAREST)
         for obj in self.object_memories:
             if obj.count < 2 or obj.image is None:
                 continue
-            x,y,w,h = obj.bbox
+            x, y, w, h = obj.bbox
             x = max(0, min(FRAME_WIDTH-1, x))
             y = max(0, min(FRAME_HEIGHT-1, y))
             w = max(1, min(FRAME_WIDTH - x, w))
             h = max(1, min(FRAME_HEIGHT - y, h))
-            overlay = cv2.resize(obj.image, (w,h))
-            roi = img[y:y+h, x:x+w]
-            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
-            clarity = min(1.0, obj.count / 10.0) * min(1.0, obj.motion / 2.0 + 0.1)
-            if clarity > 0.5:
-                overlay = cv2.resize(obj.image, (w, h), interpolation=cv2.INTER_CUBIC)
-            else:
-                small = cv2.resize(obj.image, (max(1, w//4), max(1, h//4)), interpolation=cv2.INTER_LINEAR)
-                overlay = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
-            roi = img[y:y+h, x:x+w]
-            alpha = 0.3 + 0.7 * clarity
-            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 1-alpha, overlay, alpha, 0)
-            overlay = cv2.resize(obj.image, (w,h))
+            overlay = cv2.resize(obj.image, (w, h))
             roi = img[y:y+h, x:x+w]
             img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
             if self.debug_objects:
@@ -943,7 +930,7 @@ class ElarinCore:
                 if score < best_score:
                     best_score = score
                     best = mem
-            if best is not None and best_score < 0.6:
+            if best is not None and best_score < 0.5:
                 best.update((x, y, w, h), det['hist'], det['img'], det['motion'])
             else:
                 oid = self.object_id_counter
@@ -1047,12 +1034,9 @@ class ElarinCore:
             pos = (FRAME_WIDTH - size[0] - 5, FRAME_HEIGHT - 5)
             cv2.putText(right, text, pos, font, scale, (255, 255, 255), thick, cv2.LINE_AA)
 
-        # Imagination panel (bottom left) and environment view (bottom right)
+        # Imagination panel (bottom left) and prediction difference (bottom right)
         imagination = shade(self._get_imagination_frame())
-        env = percept.get('background', np.zeros_like(frame))
-        mot = percept.get('motion', np.zeros((FRAME_HEIGHT, FRAME_WIDTH), np.uint8))
-        mot_col = cv2.cvtColor(mot, cv2.COLOR_GRAY2BGR)
-        diff_panel = shade(cv2.addWeighted(env, 0.7, mot_col, 0.3, 0))
+        diff_panel = shade(diff_panel_raw)
 
         # Build 2x2 grid
         top_row = np.concatenate([left, right], axis=1)
