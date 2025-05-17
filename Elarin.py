@@ -19,7 +19,6 @@ INFO_FILE = "elarin_info.json"
 MIN_HEARTBEAT = 0.8
 DECAY_FACTOR = 300.0  # seconds for recency weighting
 NORMALIZED_ENTROPY_THRESHOLD = 0.5
-REPULSION_FACTOR = 0.5  # for dream-mode deviation
 
 # Boredom & prediction parameters
 BORING_DELTA = 1.0
@@ -262,13 +261,6 @@ class ElarinCore:
         # Vision feed
         self.vision = VisionFeed()
 
-        # Dream variables
-        self.dreaming = False
-        self._dream_buffer        = None
-        self._dream_playlist      = None
-        self._dream_index         = 0
-        self._dream_last_switch   = 0.0
-        self._dream_duration      = 0.5
 
         # Imagination panel tracking
         self._imagination_frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
@@ -283,40 +275,6 @@ class ElarinCore:
         self.percepts = []
         threading.Thread(target=self._audio_loop, daemon=True).start()
 
-    def _build_dream_playlist(self, buffer):
-        # iterative repulsion-based sampling
-        playlist = []
-        if not buffer:
-            return playlist
-        # seed: highest entropy
-        seed = max(buffer, key=lambda m: m.state["entropy"])
-        playlist.append(seed)
-        attempts = 0
-        while len(playlist) < min(len(buffer), 10) and attempts < 20:
-            prev = playlist[-1]
-            weights = []
-            cands   = [m for m in buffer if m not in playlist]
-            for m in cands:
-                d   = np.linalg.norm(m.vector - prev.vector)
-                rec = np.exp(-(time.time()-m.time)/DECAY_FACTOR)
-                emo = 1.5 if m.association else 1.0
-                base_w = (1.0/(1.0+d)) * rec * emo
-                # repulsion from recent in playlist
-                recent = playlist[-4:]
-                if recent:
-                    sims = [1.0/(1.0+np.linalg.norm(m.vector - h.vector)) for h in recent]
-                    rep  = max(0.0, 1.0 - REPULSION_FACTOR * max(sims))
-                else:
-                    rep = 1.0
-                weights.append(base_w * rep)
-            total = sum(weights)
-            if total <= 0:
-                break
-            probs = [w/total for w in weights]
-            choice = np.random.choice(len(cands), p=probs)
-            playlist.append(cands[choice])
-            attempts += 1
-        return playlist
 
     def _voice_updater(self):
         while True:
@@ -454,7 +412,7 @@ class ElarinCore:
                 self.memory.moments,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
-            predicted_delta = lookahead_sec
+            predicted_delta = max(1.0, lookahead_sec)
             pred_time = time.time() + predicted_delta
             self.pending_diffs.append({
                 'time': pred_time,
@@ -480,36 +438,7 @@ class ElarinCore:
 
         now = time.time()
 
-        # If dream mode is active, play through the dream playlist
-        if self.dreaming:
-            if self._dream_buffer is None:
-                recent = [m for m in self.memory.moments if now - m.time <= 15.0]
-                buf    = [m for m in recent if now - m.time <= 10.0] or recent[-min(len(recent),10):]
-                self._dream_buffer = buf
-                self._dream_playlist = self._build_dream_playlist(buf)
-                self._dream_index    = 0
-                if not self._dream_playlist:
-                    self.dreaming = False
-                    self._dream_buffer = None
-                    return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
-                init_expr = self.memory.moments[-1].expression.astype(np.float32)
-                self._dream_prev_image   = init_expr.copy()
-                target_m = self._dream_playlist[0]
-                self._dream_frame_target = target_m.expression.astype(np.float32)
-                self._dream_last_switch   = now
-                dt = max(0.5, (target_m.time - now)) if target_m.time > now else 0.5
-                self._dream_duration      = dt
 
-            frame = np.clip(self._dream_frame_target, 0, 255).astype(np.uint8)
-            if now - self._dream_last_switch >= self._dream_duration:
-                self._dream_prev_image = self._dream_frame_target
-                self._dream_index = (self._dream_index + 1) % len(self._dream_playlist)
-                next_m = self._dream_playlist[self._dream_index]
-                self._dream_frame_target = next_m.expression.astype(np.float32)
-                self._dream_last_switch  = now
-                dt = max(0.5, (next_m.time - now)) if next_m.time > now else 0.5
-                self._dream_duration     = dt
-            return frame
 
         # throttle imagination updates to ~2 Hz
         if now - self._imagination_last < 0.5:
@@ -658,15 +587,6 @@ class ElarinCore:
         # Use the strongest signal to drive physiology
         stimuli_intensity = min(1.0, max(entropy_norm, audio_level, motion_level))
 
-        # Dreaming triggered by boredom only when stimuli are very low
-        low_stim = stimuli_intensity < 0.15
-        if self.state['boredom'] > BOREDOM_THRESHOLD and not self.dreaming and not self.state['sleeping'] and low_stim:
-            self.dreaming = True
-            self._dream_buffer = None
-            self._dream_playlist = None
-        elif self.dreaming and (self.state['boredom'] <= BOREDOM_THRESHOLD or not low_stim):
-            self.dreaming = False
-            self._dream_current = None
 
         # Predict next vector
         self._predict_next_vec(curr_vec)
