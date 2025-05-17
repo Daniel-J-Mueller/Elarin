@@ -66,6 +66,18 @@ def compute_audio_bands(audio, fs=16000):
     high = fft[(freqs>=2000)&(freqs<8000)].mean()
     return [low, mid, high]
 
+def compute_shape_descriptor(mask: np.ndarray) -> np.ndarray:
+    """Return log Hu moments for a binary mask."""
+    if mask is None or mask.size == 0:
+        return np.zeros(7)
+    m = cv2.moments(mask)
+    if m["m00"] == 0:
+        return np.zeros(7)
+    hu = cv2.HuMoments(m).flatten()
+    # log-scale for better numeric stability
+    hu = -np.sign(hu) * np.log10(np.abs(hu) + 1e-10)
+    return hu
+
 def ElarinState():
     return {
         "entropy": 50.0,
@@ -231,6 +243,7 @@ class ObjectMemory:
     merge_scores: dict = field(default_factory=dict)
     positions: list = field(default_factory=list)
     motion: float = 0.0
+    shape: np.ndarray = field(default_factory=lambda: np.zeros(7))
 
     def update(self, bbox, hist, image, mask, motion_level=0.0):
         x, y, w, h = bbox
@@ -246,6 +259,8 @@ class ObjectMemory:
         self.bbox = bbox
         self.image = cv2.resize(image, (32, 32)) if image is not None else self.image
         self.mask = cv2.resize(mask, (w, h)) if mask is not None else np.ones((h, w), np.uint8)*255
+        new_shape = compute_shape_descriptor(self.mask)
+        self.shape = (self.shape * self.count + new_shape) / (self.count + 1)
         self.motion = 0.5 * self.motion + 0.5 * float(motion_level)
         self.count += 1
 
@@ -516,6 +531,8 @@ class ElarinCore:
                         if not hasattr(obj, 'mask'):
                             _,_,w,h = obj.bbox
                             obj.mask = np.ones((h, w), dtype=np.uint8)*255
+                        if not hasattr(obj, 'shape'):
+                            obj.shape = compute_shape_descriptor(obj.mask)
                         objs.append(obj)
                 except Exception as e:
                     print('[Obj-Memory-Load-Error]', e)
@@ -886,8 +903,10 @@ class ElarinCore:
             new_mask[y1 - ny:y1 - ny + h1, x1 - nx:x1 - nx + w1] = np.maximum(new_mask[y1 - ny:y1 - ny + h1, x1 - nx:x1 - nx + w1], m1)
             new_mask[y2 - ny:y2 - ny + h2, x2 - nx:x2 - nx + w2] = np.maximum(new_mask[y2 - ny:y2 - ny + h2, x2 - nx:x2 - nx + w2], m2)
             a.mask = new_mask
+            a.shape = compute_shape_descriptor(new_mask)
         else:
             a.mask = None
+            a.shape = np.zeros(7)
         a.group_id = a.group_id if a.group_id is not None else a.id
         b_gid = b.group_id if b.group_id is not None else b.id
         if b_gid != a.group_id:
@@ -912,13 +931,14 @@ class ElarinCore:
                 continue
             obj_mask = np.zeros((h, w), dtype=np.uint8)
             cv2.drawContours(obj_mask, [cnt - np.array([[x, y]])], -1, 255, -1)
+            shape = compute_shape_descriptor(obj_mask)
             hsv = cv2.cvtColor(obj_img, cv2.COLOR_BGR2HSV)
             hist = cv2.calcHist([hsv], [0, 1], None, [8, 8], [0, 180, 0, 256])
             cv2.normalize(hist, hist)
             hist = hist.flatten()
             mlevel = mask[y:y+h, x:x+w].mean() / 255.0
             detections.append({'bbox': (x, y, w, h), 'hist': hist, 'img': obj_img,
-                               'mask': obj_mask, 'motion': mlevel})
+                               'mask': obj_mask, 'motion': mlevel, 'shape': shape})
 
         for det in detections:
             x, y, w, h = det['bbox']
@@ -928,16 +948,18 @@ class ElarinCore:
             for mem in self.object_memories:
                 hist_score = cv2.compareHist(mem.hist.astype(np.float32), det['hist'].astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
                 dist = np.hypot(mem.center[0] - cx, mem.center[1] - cy)
-                score = hist_score + dist / 100.0
+                shape_score = np.linalg.norm(mem.shape - det['shape']) if hasattr(mem, 'shape') else 1.0
+                score = hist_score + 0.5 * shape_score + dist / 200.0
                 if score < best_score:
                     best_score = score
                     best = mem
-            if best is not None and best_score < 0.5:
+            if best is not None and best_score < 0.8:
                 best.update((x, y, w, h), det['hist'], det['img'], det['mask'], det['motion'])
             else:
                 oid = self.object_id_counter
                 self.object_id_counter += 1
                 mem = ObjectMemory(oid, det['hist'], det['bbox'], cv2.resize(det['img'], (32, 32)), det['mask'])
+                mem.shape = det['shape']
                 mem.center = (cx, cy)
                 mem.positions = [(cx, cy)]
                 mem.motion = det['motion']
