@@ -428,95 +428,70 @@ class ElarinCore:
     def _get_imagination_frame(self):
         """Return a frame from memory representing Elarin's imagination.
 
-        The imagination panel becomes more adventurous as entropy drops.  At
-        high entropy we stick close to the current trajectory (using the next
-        frames of similar memories).  When entropy is low we draw from older and
-        more distant memories and allow bigger jumps forward or backward in
-        those sequences.  This is not meant to predict the next frame but to
-        spark ideas about what *could* happen.
+        This implementation no longer references the current camera input.  It
+        selects frames solely from the memory bank with a bias toward recent
+        memories.  Memories newer than five seconds receive a linear dampening
+        so the imagination does not simply mirror the present moment.
         """
 
         now = time.time()
 
+        # If dream mode is active, play through the dream playlist
+        if self.dreaming:
+            if self._dream_buffer is None:
+                recent = [m for m in self.memory.moments if now - m.time <= 15.0]
+                buf    = [m for m in recent if now - m.time <= 10.0] or recent[-min(len(recent), 10):]
+                self._dream_buffer = buf
+                self._dream_playlist = self._build_dream_playlist(buf)
+                self._dream_index = 0
+                if not self._dream_playlist:
+                    self.dreaming = False
+                    self._dream_buffer = None
+                    return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
+                init_expr = self.memory.moments[-1].expression.astype(np.float32)
+                self._dream_prev_image = init_expr.copy()
+                target_m = self._dream_playlist[0]
+                self._dream_frame_target = target_m.expression.astype(np.float32)
+                self._dream_last_switch = now
+                dt = max(0.5, (target_m.time - now)) if target_m.time > now else 0.5
+                self._dream_duration = dt
 
+            frame = np.clip(self._dream_frame_target, 0, 255).astype(np.uint8)
+            if now - self._dream_last_switch >= self._dream_duration:
+                self._dream_prev_image = self._dream_frame_target
+                self._dream_index = (self._dream_index + 1) % len(self._dream_playlist)
+                next_m = self._dream_playlist[self._dream_index]
+                self._dream_frame_target = next_m.expression.astype(np.float32)
+                self._dream_last_switch = now
+                dt = max(0.5, (next_m.time - now)) if next_m.time > now else 0.5
+                self._dream_duration = dt
+            return frame
 
         # throttle imagination updates to ~2 Hz
         if now - self._imagination_last < 0.5:
             return self._imagination_frame
         self._imagination_last = now
 
-        if len(self.memory.moments) < 2:
+        if not self.memory.moments:
             self._imagination_frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
             return self._imagination_frame
 
-        # Increase randomness when boredom is high to keep imagination fresh
-        boredom = self.state.get("boredom", 0.0)
-        rand_chance = min(0.5, boredom / (BOREDOM_THRESHOLD * 2))
-        if random.random() < rand_chance and self.memory.moments:
-            rand_m = random.choice(self.memory.moments)
-            self._imagination_frame = rand_m.expression.copy()
-            return self._imagination_frame
+        # Build weighted choices based solely on memory recency
+        ages = np.array([now - m.time for m in self.memory.moments])
+        weights = np.exp(-ages / DECAY_FACTOR)
 
-        # Determine creativity level inversely proportional to entropy.
-        # 0 → conservative, 1 → highly imaginative
-        ent = self.state.get("entropy", 100.0)
-        creativity = max(0.0, min(1.0, 1.0 - ent / 100.0))
+        # Dampen very recent memories so imagination drifts away from the present
+        recent_mask = ages < 5.0
+        weights[recent_mask] *= ages[recent_mask] / 5.0
 
-        # Use the latest moment as the reference point
-        last_m = self.memory.moments[-1]
-        vec = last_m.vector
-        top_n = 5 + int(creativity * 15)
-        neighbors = similar_moments(self.memory.moments[:-1], vec, top_n=top_n)
+        total = weights.sum()
+        if total <= 0:
+            chosen = random.choice(self.memory.moments)
+        else:
+            probs = weights / total
+            idx = np.random.choice(len(self.memory.moments), p=probs)
+            chosen = self.memory.moments[idx]
 
-        # Gather frames adjacent to each neighbor.  The lower the entropy,
-        # the larger the offset we allow when sampling around those neighbors
-        # to produce more imaginative variations.
-        next_frames = []
-        max_offset = 1 + int(creativity * 3)
-        for n in neighbors:
-            try:
-                idx = self.memory.moments.index(n)
-            except ValueError:
-                continue
-            off = random.randint(1, max_offset)
-            for sign in (-1, 1):
-                target = idx + sign * off
-                if 0 <= target < len(self.memory.moments):
-                    next_frames.append(self.memory.moments[target])
-
-        # When very low entropy, also sprinkle in some random distant memories
-        if creativity > 0.5:
-            extra = int(creativity * 5)
-            for _ in range(extra):
-                next_frames.append(random.choice(self.memory.moments))
-
-        if next_frames:
-            # choose up to two candidate frames for imagination
-            cands = random.sample(next_frames, min(2, len(next_frames)))
-            if len(cands) == 2:
-                diff = cv2.absdiff(cands[0].expression, cands[1].expression).mean()
-                if diff < 30.0:
-                    self._imagination_frame = blend_frames([c.expression for c in cands])
-                    return self._imagination_frame
-                chosen = random.choice(cands)
-                self._imagination_frame = chosen.expression.copy()
-                return self._imagination_frame
-            else:
-                self._imagination_frame = cands[0].expression.copy()
-                return self._imagination_frame
-
-        # Fallback: sample from memory.  When creativity is high, bias toward
-        # older memories, otherwise pick frames with higher entropy.
-        if creativity > 0.5:
-            idx = random.randint(0, len(self.memory.moments) - 1)
-            self._imagination_frame = self.memory.moments[idx].expression.copy()
-            return self._imagination_frame
-
-        threshold = 50.0
-        interesting = [m for m in self.memory.moments
-                       if m.state.get("entropy", 0.0) > threshold]
-        candidates = interesting if interesting else self.memory.moments
-        chosen = random.choice(candidates)
         self._imagination_frame = chosen.expression.copy()
         return self._imagination_frame
 
