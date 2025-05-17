@@ -413,11 +413,39 @@ class ElarinCore:
             self.predicted_moment = None
 
     def _get_imagination_frame(self):
-        """Return a frame from memory representing Elarin's imagination."""
-        if not self.memory.moments:
+        """Return a frame from memory representing Elarin's imagination.
+
+        Instead of always pulling the highest-entropy frames (which tended to
+        lock onto the initial moments of a run), try to imagine what might come
+        next based on similar past experiences.  We look for moments in memory
+        that resemble the most recent perception and display the frame that
+        followed each similar moment.  This links memories together and keeps
+        the imagination panel fresh.
+        """
+
+        if len(self.memory.moments) < 2:
             return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
 
-        # Prefer moments with higher entropy for more "interesting" content
+        # Use the latest moment as the reference point
+        last_m = self.memory.moments[-1]
+        vec = last_m.vector
+        neighbors = similar_moments(self.memory.moments[:-1], vec, top_n=5)
+
+        # Gather the moments that occurred right after each neighbor
+        next_frames = []
+        for n in neighbors:
+            try:
+                idx = self.memory.moments.index(n)
+                if idx + 1 < len(self.memory.moments):
+                    next_frames.append(self.memory.moments[idx + 1])
+            except ValueError:
+                continue
+
+        if next_frames:
+            chosen = random.choice(next_frames)
+            return chosen.expression.copy()
+
+        # Fallback to high-entropy sampling if no neighbors found
         threshold = 50.0
         interesting = [m for m in self.memory.moments
                        if m.state.get("entropy", 0.0) > threshold]
