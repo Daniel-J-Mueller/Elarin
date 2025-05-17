@@ -442,6 +442,13 @@ class ElarinCore:
         if len(self.memory.moments) < 2:
             return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
 
+        # Increase randomness when boredom is high to keep imagination fresh
+        boredom = self.state.get("boredom", 0.0)
+        rand_chance = min(0.5, boredom / (BOREDOM_THRESHOLD * 2))
+        if random.random() < rand_chance and self.memory.moments:
+            rand_m = random.choice(self.memory.moments)
+            return rand_m.expression.copy()
+
         # Use the latest moment as the reference point
         last_m = self.memory.moments[-1]
         vec = last_m.vector
