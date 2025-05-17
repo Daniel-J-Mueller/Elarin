@@ -580,6 +580,15 @@ class ElarinCore:
             y = max(0, min(FRAME_HEIGHT-1, y))
             w = max(1, min(FRAME_WIDTH - x, w))
             h = max(1, min(FRAME_HEIGHT - y, h))
+            clarity = min(1.0, obj.count / 10.0) * min(1.0, obj.motion / 2.0 + 0.1)
+            if clarity > 0.5:
+                overlay = cv2.resize(obj.image, (w, h), interpolation=cv2.INTER_CUBIC)
+            else:
+                small = cv2.resize(obj.image, (max(1, w//4), max(1, h//4)), interpolation=cv2.INTER_LINEAR)
+                overlay = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+            roi = img[y:y+h, x:x+w]
+            alpha = 0.3 + 0.7 * clarity
+            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 1-alpha, overlay, alpha, 0)
             overlay = cv2.resize(obj.image, (w,h))
             roi = img[y:y+h, x:x+w]
             img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
@@ -794,6 +803,21 @@ class ElarinCore:
             cx, cy = x + w/2.0, y + h/2.0
             best = None
             best_score = 1e9
+            hist = hist.flatten()
+            center = (x + w/2.0, y + h/2.0)
+            match = None
+            best = 999.0
+            for mem in self.object_memories:
+                dist = np.linalg.norm(np.array(mem.positions[-1]) - np.array(center)) if mem.positions else 999.0
+                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
+                total = score + dist/100.0
+                if total < best and dist < 100:
+                    best = total
+                    match = mem
+            if match is not None and best < 0.5:
+                match.update(hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
+            match = None
+            best = 1.0
             for mem in self.object_memories:
                 hist_score = cv2.compareHist(mem.hist.astype(np.float32), det['hist'].astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
                 dist = np.hypot(mem.center[0]-cx, mem.center[1]-cy)
@@ -810,6 +834,48 @@ class ElarinCore:
                 mem.center = (cx, cy)
                 mem.group_id = oid
                 self.object_memories.append(mem)
+        self._merge_objects()
+
+    def _merge_objects(self):
+        objs = self.object_memories
+        keep = [True] * len(objs)
+        for i in range(len(objs)):
+            if not keep[i]:
+                continue
+            o1 = objs[i]
+            for j in range(i+1, len(objs)):
+                if not keep[j]:
+                    continue
+                o2 = objs[j]
+                if len(o1.positions) < 2 or len(o2.positions) < 2:
+                    continue
+                v1 = np.subtract(o1.positions[-1], o1.positions[-2])
+                v2 = np.subtract(o2.positions[-1], o2.positions[-2])
+                if np.linalg.norm(v1 - v2) < 5:
+                    d_now = np.linalg.norm(np.subtract(o1.positions[-1], o2.positions[-1]))
+                    d_prev = np.linalg.norm(np.subtract(o1.positions[-2], o2.positions[-2]))
+                    if abs(d_now - d_prev) < 5 and d_now < 50:
+                        total = o1.count + o2.count
+                        w1 = o1.count / total
+                        w2 = o2.count / total
+                        o1.hist = (o1.hist * w1 + o2.hist * w2)
+                        o1.count = total
+                        o1.motion = max(o1.motion, o2.motion)
+                        x1,y1,w1b,h1b = o1.bbox
+                        x2,y2,w2b,h2b = o2.bbox
+                        x = min(x1, x2)
+                        y = min(y1, y2)
+                        w = max(x1+w1b, x2+w2b) - x
+                        h = max(y1+h1b, y2+h2b) - y
+                        o1.bbox = (x,y,w,h)
+                        if o1.image is not None and o2.image is not None:
+                            img1 = cv2.resize(o1.image, (32,32))
+                            img2 = cv2.resize(o2.image, (32,32))
+                            o1.image = cv2.addWeighted(img1, w1, img2, w2, 0)
+                        o1.positions.extend(o2.positions)
+                        o1.positions = o1.positions[-5:]
+                        keep[j] = False
+        self.object_memories = [o for o,k in zip(objs, keep) if k]
 
         # Merge objects that move similarly
         for i in range(len(self.object_memories)):
