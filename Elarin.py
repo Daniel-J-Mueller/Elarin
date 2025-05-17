@@ -417,26 +417,36 @@ class ElarinCore:
         neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
         preds = []
         dts = []
+        # Prediction horizon scales with entropy.  Low entropy → look further
+        entropy_norm   = max(0.0, min(1.0, self.state["entropy"] / 100.0))
+        lookahead_sec  = 2.0 + (1.0 - entropy_norm) * 3.0  # 2s → 5s
+        lookahead_idx  = max(1, int(lookahead_sec * 30))   # assume ~30 FPS
+
         for m in neighbors:
             try:
                 idx = self.memory.moments.index(m)
-                next_m = self.memory.moments[idx+1]
+                target = idx + lookahead_idx
+                if target >= len(self.memory.moments):
+                    continue
+                next_m = self.memory.moments[target]
                 preds.append(next_m.vector)
                 dts.append(next_m.time - m.time)
             except (ValueError, IndexError):
                 continue
+
         if preds:
             self.predicted_vec = np.mean(preds, axis=0)
             self.predicted_moment = min(
                 self.memory.moments,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
-            predicted_delta = max(0.1, float(np.mean(dts)) if dts else 0.5)
+            predicted_delta = lookahead_sec
             pred_time = time.time() + predicted_delta
             self.pending_diffs.append({
                 'time': pred_time,
                 'frame': self.predicted_moment.expression.copy(),
-                'moment': self.predicted_moment
+                'moment': self.predicted_moment,
+                'delta': predicted_delta
             })
             self.pending_diffs.sort(key=lambda x: x['time'])
         else:
@@ -702,7 +712,10 @@ class ElarinCore:
                 err = diff.mean()
                 if err < 20.0:
                     m = item['moment']
-                    m.predictive_value = min(1.0, m.predictive_value + 0.1)
+                    entropy_factor = m.state.get('entropy', 0.0) / 100.0
+                    delta_factor   = min(1.0, item.get('delta', 0.0) / 5.0)
+                    inc = 0.1 * delta_factor * entropy_factor
+                    m.predictive_value = min(1.0, m.predictive_value + inc)
                 if BLEND_DETERMINISM:
                     m = item['moment']
                     blended = cv2.addWeighted(
