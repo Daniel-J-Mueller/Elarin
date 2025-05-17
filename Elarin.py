@@ -11,10 +11,13 @@ import os
 import random
 import sys
 import json
+import heapq
+from dataclasses import dataclass
 
 FRAME_WIDTH, FRAME_HEIGHT = 640, 480
 AUDIO_SAMPLE_DURATION = 0.1
 MEMORY_FILE = "elarin_memory.pkl"
+OBJECT_MEMORY_DIR = "object_memories"
 INFO_FILE = "elarin_info.json"
 MIN_HEARTBEAT = 0.8
 DECAY_FACTOR = 300.0  # seconds for recency weighting
@@ -128,30 +131,141 @@ class Moment:
         self.association = None
         self.spectrum = None
         self.vector = None
+        self.pose = percepts.get('pose', np.array([0.0, 0.0]))
         # how predictive this memory has been (0.0–1.0)
         self.predictive_value = 0.5
+
+class KDNode:
+    def __init__(self, point, data, axis=0, left=None, right=None):
+        self.point = point
+        self.data = data
+        self.axis = axis
+        self.left = left
+        self.right = right
+
+class SimpleKDTree:
+    def __init__(self, points, data):
+        if len(points) == 0:
+            self.root = None
+            self.k = 0
+        else:
+            self.k = points.shape[1]
+            idx = np.arange(len(points))
+            self.root = self._build(points, data, idx, depth=0)
+
+    def _build(self, pts, dat, idx, depth):
+        if len(idx) == 0:
+            return None
+        axis = depth % self.k
+        idx_sorted = idx[np.argsort(pts[idx, axis])]
+        mid = len(idx_sorted) // 2
+        i = idx_sorted[mid]
+        node = KDNode(pts[i], dat[i], axis=axis)
+        node.left = self._build(pts, dat, idx_sorted[:mid], depth + 1)
+        node.right = self._build(pts, dat, idx_sorted[mid+1:], depth + 1)
+        return node
+
+    def _query(self, node, target, k, heap):
+        if node is None:
+            return
+        dist = float(np.linalg.norm(target - node.point))
+        if len(heap) < k:
+            heapq.heappush(heap, (-dist, node.data))
+        else:
+            if dist < -heap[0][0]:
+                heapq.heapreplace(heap, (-dist, node.data))
+        axis = node.axis
+        diff = target[axis] - node.point[axis]
+        first, second = (node.left, node.right) if diff < 0 else (node.right, node.left)
+        self._query(first, target, k, heap)
+        if len(heap) < k or abs(diff) < -heap[0][0]:
+            self._query(second, target, k, heap)
+
+    def query(self, target, k=1):
+        if self.root is None:
+            return []
+        heap = []
+        self._query(self.root, target, k, heap)
+        heap.sort(reverse=True)
+        return [d for _, d in heap]
 
 class MemoryBank:
     def __init__(self, maxlen=100000):
         self.moments = []
         self.maxlen = maxlen
+        self.kd_tree = None
     def add(self, m):
         self.moments.append(m)
         if len(self.moments) > self.maxlen:
             self.moments.pop(0)
+        self._rebuild_index()
+
+    def _rebuild_index(self):
+        if not self.moments:
+            self.kd_tree = None
+            return
+        vecs = np.array([m.vector for m in self.moments if m.vector is not None])
+        refs = [m for m in self.moments if m.vector is not None]
+        self.kd_tree = SimpleKDTree(vecs, refs)
+
+class ObjectMemory:
+    def __init__(self, obj_id, hist, bbox, image):
+        self.id = obj_id
+        self.hist = hist
+        self.bbox = bbox  # (x, y, w, h)
+        self.image = image
+        self.count = 1
 
 class VisionFeed:
     def __init__(self, cam_index=0):
         self.cap = cv2.VideoCapture(cam_index)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+        self.prev_gray = None
+        self.background = None
+        self.stationary = 0
+        self.pose = np.array([0.0, 0.0])
+        self.world = None
     def get_percept(self):
         ret, frame = self.cap.read()
         if not ret:
             frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         motion = np.abs(gray.astype(np.int16) - gray.mean()).astype(np.uint8)
-        return {"video": frame, "saliency": gray, "motion": motion}
+
+        if self.prev_gray is not None:
+            p0 = cv2.goodFeaturesToTrack(self.prev_gray, maxCorners=50, qualityLevel=0.3, minDistance=7)
+            if p0 is not None:
+                p1, st, _ = cv2.calcOpticalFlowPyrLK(self.prev_gray, gray, p0, None)
+                good_old = p0[st==1]
+                good_new = p1[st==1]
+                if len(good_old) > 0:
+                    delta = np.mean(good_new - good_old, axis=0)
+                    self.pose += delta.ravel()
+                    if np.linalg.norm(delta) < 1.0:
+                        self.stationary += 1
+                    else:
+                        self.stationary = 0
+
+        self.prev_gray = gray
+
+        if self.background is None:
+            self.background = frame.astype(np.float32)
+        if self.stationary > 5:
+            cv2.accumulateWeighted(frame, self.background, 0.02)
+
+        bg = self.background.astype(np.uint8)
+        dyn = cv2.absdiff(frame, bg)
+        dyn_gray = cv2.cvtColor(dyn, cv2.COLOR_BGR2GRAY)
+        _, dyn_mask = cv2.threshold(dyn_gray, 25, 255, cv2.THRESH_BINARY)
+
+        return {
+            "video": frame,
+            "saliency": gray,
+            "motion": dyn_mask,
+            "background": bg,
+            "pose": self.pose.copy()
+        }
     def release(self):
         self.cap.release()
 
@@ -206,6 +320,8 @@ def vectorize_moment(m):
     return v
 
 def similar_moments(pool, vec, top_n=10):
+    if hasattr(pool, "kd_tree") and pool.kd_tree is not None:
+        return pool.kd_tree.query(vec, k=top_n)
     candidates = pool.moments if hasattr(pool, "moments") else pool
     dists = [np.linalg.norm(m.vector - vec) for m in candidates]
     idx   = np.argsort(dists)[:top_n]
@@ -246,6 +362,8 @@ class ElarinCore:
         self.entropy_min = float("inf")
         self.entropy_max = float("-inf")
         self.memory = self._load_memory()
+        self.object_memories = self._load_object_memories()
+        self.object_id_counter = (max([m.id for m in self.object_memories], default=0) + 1)
         self.session_start = time.time()
         self.overall_start = self._load_info()
         self.last_status_time = 0
@@ -323,7 +441,10 @@ class ElarinCore:
                             m.percepts['audio'], fs=self.fs, bands=8)
                     if not hasattr(m, 'predictive_value'):
                         m.predictive_value = 0.5
+                    if not hasattr(m, 'pose'):
+                        m.pose = m.percepts.get('pose', np.array([0.0, 0.0]))
                 print(f"[Memory-Load] Restored {len(mem.moments)} moments")
+                mem._rebuild_index()
                 return mem
             except Exception as e:
                 print("[Memory-Load-Error]", e)
@@ -333,6 +454,23 @@ class ElarinCore:
                 except OSError:
                     pass
         return MemoryBank()
+
+    def _load_object_memories(self):
+        objs = []
+        if os.path.isdir(OBJECT_MEMORY_DIR):
+            for fn in os.listdir(OBJECT_MEMORY_DIR):
+                if not fn.endswith('.pkl'):
+                    continue
+                path = os.path.join(OBJECT_MEMORY_DIR, fn)
+                try:
+                    with open(path, 'rb') as f:
+                        obj = pickle.load(f)
+                        objs.append(obj)
+                except Exception as e:
+                    print('[Obj-Memory-Load-Error]', e)
+        else:
+            os.makedirs(OBJECT_MEMORY_DIR, exist_ok=True)
+        return objs
 
     def _load_info(self):
         if os.path.exists(INFO_FILE):
@@ -358,6 +496,17 @@ class ElarinCore:
             except Exception as e:
                 print('[Memory-Save-Error]', e)
         threading.Thread(target=_s, daemon=True).start()
+        self._save_object_memories()
+
+    def _save_object_memories(self):
+        os.makedirs(OBJECT_MEMORY_DIR, exist_ok=True)
+        for obj in self.object_memories:
+            path = os.path.join(OBJECT_MEMORY_DIR, f'obj_{obj.id}.pkl')
+            try:
+                with open(path, 'wb') as f:
+                    pickle.dump(obj, f)
+            except Exception as e:
+                print('[Obj-Memory-Save-Error]', e)
 
     def _update_status(self):
         now = time.time()
@@ -502,7 +651,22 @@ class ElarinCore:
             idx = np.random.choice(len(self.memory.moments), p=probs)
             chosen = self.memory.moments[idx]
 
-        self._imagination_frame = chosen.expression.copy()
+        base = chosen.expression.copy()
+        small = cv2.resize(base, (FRAME_WIDTH//16, FRAME_HEIGHT//16), interpolation=cv2.INTER_LINEAR)
+        frosted = cv2.resize(small, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_NEAREST)
+        img = frosted
+        for obj in self.object_memories:
+            if obj.count < 2 or obj.image is None:
+                continue
+            x,y,w,h = obj.bbox
+            x = max(0, min(FRAME_WIDTH-1, x))
+            y = max(0, min(FRAME_HEIGHT-1, y))
+            w = max(1, min(FRAME_WIDTH - x, w))
+            h = max(1, min(FRAME_HEIGHT - y, h))
+            overlay = cv2.resize(obj.image, (w,h))
+            roi = img[y:y+h, x:x+w]
+            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
+        self._imagination_frame = img
         return self._imagination_frame
 
     def run(self):
@@ -513,7 +677,7 @@ class ElarinCore:
             self._update_state(p)
             vision, predicted = self._imagine(p)
             self._record(p, vision)
-            self._render(vision, predicted)
+            self._render(p, vision, predicted)
             running = self._handle_events()
             if time.time() - last_save > 30:
                 self._save_memory()
@@ -630,6 +794,7 @@ class ElarinCore:
             self.memory.moments.pop(0)
         self.memory.add(m)
         self._update_status()
+        self._update_objects(p)
 
     def _consume_prediction_diffs(self, current_frame):
         """Return an overlay showing prediction errors due at this time."""
@@ -664,7 +829,41 @@ class ElarinCore:
                     m.expression = blended
         return overlay
 
-    def _render(self, frame, predicted):
+    def _update_objects(self, p):
+        motion = p['motion']
+        _, mask = cv2.threshold(motion, 30, 255, cv2.THRESH_BINARY)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in contours:
+            if cv2.contourArea(cnt) < 800:
+                continue
+            x,y,w,h = cv2.boundingRect(cnt)
+            obj_img = p['video'][y:y+h, x:x+w]
+            if obj_img.size == 0:
+                continue
+            hsv = cv2.cvtColor(obj_img, cv2.COLOR_BGR2HSV)
+            hist = cv2.calcHist([hsv], [0,1], None, [8,8], [0,180,0,256])
+            cv2.normalize(hist, hist)
+            hist = hist.flatten()
+            match = None
+            best = 1.0
+            for mem in self.object_memories:
+                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
+                if score < best:
+                    best = score
+                    match = mem
+            if match is not None and best < 0.3:
+                match.hist = (match.hist * match.count + hist) / (match.count + 1)
+                match.count += 1
+                match.bbox = (x,y,w,h)
+                match.image = cv2.resize(obj_img, (32,32))
+            else:
+                oid = self.object_id_counter
+                self.object_id_counter += 1
+                mem = ObjectMemory(oid, hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
+                self.object_memories.append(mem)
+
+    def _render(self, percept, frame, predicted):
         # Update prediction history and compute immediate diff panel
         self._consume_prediction_diffs(frame)
         diff_panel_raw = cv2.absdiff(frame, predicted)
@@ -697,9 +896,12 @@ class ElarinCore:
             pos = (FRAME_WIDTH - size[0] - 5, FRAME_HEIGHT - 5)
             cv2.putText(right, text, pos, font, scale, (255, 255, 255), thick, cv2.LINE_AA)
 
-        # Imagination panel (bottom left) and empty panel (bottom right)
+        # Imagination panel (bottom left) and environment view (bottom right)
         imagination = shade(self._get_imagination_frame())
-        diff_panel = shade(diff_panel_raw)
+        env = percept.get('background', np.zeros_like(frame))
+        mot = percept.get('motion', np.zeros((FRAME_HEIGHT, FRAME_WIDTH), np.uint8))
+        mot_col = cv2.cvtColor(mot, cv2.COLOR_GRAY2BGR)
+        diff_panel = shade(cv2.addWeighted(env, 0.7, mot_col, 0.3, 0))
 
         # Build 2x2 grid
         top_row = np.concatenate([left, right], axis=1)
