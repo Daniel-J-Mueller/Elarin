@@ -547,9 +547,8 @@ class ElarinCore:
 
     def _render(self, frame, predicted):
         # Base frame shading and audio tint
-        pulse = self.state['pulse_rate']
-        phase = (time.time() % pulse) / pulse
-        glow  = int(50 + 205 * (1 - abs(phase * 2 - 1)))
+        # Use a fixed overlay brightness to avoid pulsing/flashing
+        glow = 128
         def shade(img):
             ov  = np.full_like(img, glow, np.uint8)
             bd  = cv2.addWeighted(img, 0.8, ov, 0.2, 0)
