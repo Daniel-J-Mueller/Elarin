@@ -592,22 +592,12 @@ class ElarinCore:
             return
         neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
         preds = []
-        pred_moms = []
         dts = []
-        # Prediction horizon scales with entropy.  Low entropy → look further
-        entropy_norm   = max(0.0, min(1.0, self.state["entropy"] / 100.0))
-        lookahead_sec  = 2.0 + (1.0 - entropy_norm) * 3.0  # 2s → 5s
-        lookahead_idx  = max(1, int(lookahead_sec * 30))   # assume ~30 FPS
-
         for m in neighbors:
             try:
                 idx = self.memory.moments.index(m)
-                target = idx + lookahead_idx
-                if target >= len(self.memory.moments):
-                    continue
-                next_m = self.memory.moments[target]
+                next_m = self.memory.moments[idx+1]
                 preds.append(next_m.vector)
-                pred_moms.append(next_m)
                 dts.append(next_m.time - m.time)
             except (ValueError, IndexError):
                 continue
@@ -615,21 +605,21 @@ class ElarinCore:
         if preds:
             self.predicted_vec = np.mean(preds, axis=0)
             self.predicted_moment = min(
-                pred_moms,
+                self.memory.moments,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
-            predicted_delta = np.mean(dts) if dts else lookahead_sec
-            pred_time = time.time() + predicted_delta
+            self.predicted_delta = max(0.1, float(np.mean(dts)) if dts else 0.5)
+            pred_time = time.time() + self.predicted_delta
             self.pending_diffs.append({
                 'time': pred_time,
                 'frame': self.predicted_moment.expression.copy(),
-                'moment': self.predicted_moment,
-                'delta': predicted_delta
+                'moment': self.predicted_moment
             })
             self.pending_diffs.sort(key=lambda x: x['time'])
         else:
             self.predicted_vec = None
             self.predicted_moment = None
+            self.predicted_delta = None
 
     def _get_imagination_frame(self):
         """Return a frame from memory representing Elarin's imagination.
@@ -861,20 +851,7 @@ class ElarinCore:
                 err = diff.mean()
                 if err < 20.0:
                     m = item['moment']
-                    entropy_factor = m.state.get('entropy', 0.0) / 100.0
-                    delta_factor   = min(1.0, item.get('delta', 0.0) / 5.0)
-                    inc = 0.1 * delta_factor * entropy_factor
-                    m.predictive_value = min(1.0, m.predictive_value + inc)
-                if BLEND_DETERMINISM:
-                    m = item['moment']
-                    blended = cv2.addWeighted(
-                        m.expression.astype(np.float32),
-                        0.8,
-                        current_frame.astype(np.float32),
-                        0.2,
-                        0
-                    ).astype(np.uint8)
-                    m.expression = blended
+                    m.predictive_value = min(1.0, m.predictive_value + 0.1)
         return overlay
 
     def _merge_object_pair(self, a, b):
