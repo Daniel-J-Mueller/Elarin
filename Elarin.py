@@ -415,11 +415,12 @@ class ElarinCore:
                 self.memory.moments,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
-            dt = float(np.mean(dts)) if dts else 0.5
-            pred_time = time.time() + max(0.1, dt)
+            self.predicted_delta = max(0.1, float(np.mean(dts)) if dts else 0.5)
+            pred_time = time.time() + self.predicted_delta
             self.pending_diffs.append({
                 'time': pred_time,
-                'frame': self.predicted_moment.expression.copy()
+                'frame': self.predicted_moment.expression.copy(),
+                'moment': self.predicted_moment
             })
             self.pending_diffs.sort(key=lambda x: x['time'])
         else:
@@ -651,6 +652,12 @@ class ElarinCore:
         for item in ready:
             diff = cv2.absdiff(current_frame, item['frame'])
             overlay = cv2.addWeighted(overlay, 1.0, diff, alpha, 0)
+            # Strengthen memory if prediction was accurate
+            if 'moment' in item:
+                err = diff.mean()
+                if err < 20.0:
+                    m = item['moment']
+                    m.predictive_value = min(1.0, m.predictive_value + 0.1)
         return overlay
 
     def _render(self, frame, predicted):
