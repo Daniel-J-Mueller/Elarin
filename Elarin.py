@@ -212,6 +212,16 @@ def similar_moments(pool, vec, top_n=10):
     idx   = np.argsort(dists)[:top_n]
     return [candidates[i] for i in idx]
 
+def blend_frames(frames):
+    """Blend a list of frames with equal transparency."""
+    if not frames:
+        return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
+    result = np.zeros_like(frames[0], dtype=np.float32)
+    alpha = 1.0 / len(frames)
+    for f in frames:
+        result += f.astype(np.float32) * alpha
+    return np.clip(result, 0, 255).astype(np.uint8)
+
 class ElarinCore:
     def __init__(self):
         # Audio setup
@@ -498,8 +508,16 @@ class ElarinCore:
                 next_frames.append(random.choice(self.memory.moments))
 
         if next_frames:
-            chosen = random.choice(next_frames)
-            return chosen.expression.copy()
+            # choose up to two candidate frames for imagination
+            cands = random.sample(next_frames, min(2, len(next_frames)))
+            if len(cands) == 2:
+                diff = cv2.absdiff(cands[0].expression, cands[1].expression).mean()
+                if diff < 30.0:
+                    return blend_frames([c.expression for c in cands])
+                chosen = random.choice(cands)
+                return chosen.expression.copy()
+            else:
+                return cands[0].expression.copy()
 
         # Fallback: sample from memory.  When creativity is high, bias toward
         # older memories, otherwise pick frames with higher entropy.
