@@ -209,11 +209,12 @@ class MemoryBank:
         self.kd_tree = SimpleKDTree(vecs, refs)
 
 class ObjectMemory:
-    def __init__(self, obj_id, hist, bbox, image):
+    def __init__(self, obj_id, hist, bbox, image, mask):
         self.id = obj_id
         self.hist = hist
         self.bbox = bbox  # (x, y, w, h)
         self.image = image
+        self.mask = mask
         self.count = 1
 
 @dataclass
@@ -222,6 +223,7 @@ class ObjectMemory:
     hist: np.ndarray
     bbox: tuple  # (x, y, w, h)
     image: np.ndarray
+    mask: np.ndarray
     count: int = 1
     center: tuple = field(default_factory=lambda: (0.0, 0.0))
     velocity: tuple = field(default_factory=lambda: (0.0, 0.0))
@@ -230,7 +232,7 @@ class ObjectMemory:
     positions: list = field(default_factory=list)
     motion: float = 0.0
 
-    def update(self, bbox, hist, image, motion_level=0.0):
+    def update(self, bbox, hist, image, mask, motion_level=0.0):
         x, y, w, h = bbox
         cx, cy = x + w / 2.0, y + h / 2.0
         vx = cx - self.center[0]
@@ -243,6 +245,7 @@ class ObjectMemory:
         self.hist = (self.hist * self.count + hist) / (self.count + 1)
         self.bbox = bbox
         self.image = cv2.resize(image, (32, 32)) if image is not None else self.image
+        self.mask = cv2.resize(mask, (w, h)) if mask is not None else np.ones((h, w), np.uint8)*255
         self.motion = 0.5 * self.motion + 0.5 * float(motion_level)
         self.count += 1
 
@@ -510,6 +513,9 @@ class ElarinCore:
                             obj.positions = [(x + w/2.0, y + h/2.0)]
                         if not hasattr(obj, 'motion'):
                             obj.motion = 0.0
+                        if not hasattr(obj, 'mask'):
+                            _,_,w,h = obj.bbox
+                            obj.mask = np.ones((h, w), dtype=np.uint8)*255
                         objs.append(obj)
                 except Exception as e:
                     print('[Obj-Memory-Load-Error]', e)
@@ -700,10 +706,13 @@ class ElarinCore:
             w = max(1, min(FRAME_WIDTH - x, w))
             h = max(1, min(FRAME_HEIGHT - y, h))
             overlay = cv2.resize(obj.image, (w, h))
+            mask = cv2.resize(obj.mask, (w, h), interpolation=cv2.INTER_NEAREST) if obj.mask is not None else np.ones((h, w), np.uint8)*255
             roi = img[y:y+h, x:x+w]
-            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
+            alpha = (mask / 255.0)[..., None]
+            img[y:y+h, x:x+w] = roi * (1 - alpha) + overlay * alpha
             if self.debug_objects:
-                cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 1)
+                contours,_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(img[y:y+h, x:x+w], contours, -1, (255,0,0), 1)
         self._imagination_frame = img
         return self._imagination_frame
 
@@ -861,13 +870,24 @@ class ElarinCore:
         ny = min(y1, y2)
         nx2 = max(x1 + w1, x2 + w2)
         ny2 = max(y1 + h1, y2 + h2)
-        a.bbox = (nx, ny, nx2 - nx, ny2 - ny)
+        new_w = nx2 - nx
+        new_h = ny2 - ny
+        a.bbox = (nx, ny, new_w, new_h)
         a.hist = (a.hist * a.count + b.hist * b.count) / (a.count + b.count)
         a.count += b.count
         a.center = ((a.center[0] + b.center[0]) / 2.0,
                     (a.center[1] + b.center[1]) / 2.0)
         a.velocity = ((a.velocity[0] + b.velocity[0]) / 2.0,
                       (a.velocity[1] + b.velocity[1]) / 2.0)
+        if a.mask is not None and b.mask is not None:
+            m1 = cv2.resize(a.mask, (w1, h1))
+            m2 = cv2.resize(b.mask, (w2, h2))
+            new_mask = np.zeros((new_h, new_w), dtype=np.uint8)
+            new_mask[y1 - ny:y1 - ny + h1, x1 - nx:x1 - nx + w1] = np.maximum(new_mask[y1 - ny:y1 - ny + h1, x1 - nx:x1 - nx + w1], m1)
+            new_mask[y2 - ny:y2 - ny + h2, x2 - nx:x2 - nx + w2] = np.maximum(new_mask[y2 - ny:y2 - ny + h2, x2 - nx:x2 - nx + w2], m2)
+            a.mask = new_mask
+        else:
+            a.mask = None
         a.group_id = a.group_id if a.group_id is not None else a.id
         b_gid = b.group_id if b.group_id is not None else b.id
         if b_gid != a.group_id:
@@ -890,12 +910,15 @@ class ElarinCore:
             obj_img = p['video'][y:y+h, x:x+w]
             if obj_img.size == 0:
                 continue
+            obj_mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.drawContours(obj_mask, [cnt - np.array([[x, y]])], -1, 255, -1)
             hsv = cv2.cvtColor(obj_img, cv2.COLOR_BGR2HSV)
             hist = cv2.calcHist([hsv], [0, 1], None, [8, 8], [0, 180, 0, 256])
             cv2.normalize(hist, hist)
             hist = hist.flatten()
             mlevel = mask[y:y+h, x:x+w].mean() / 255.0
-            detections.append({'bbox': (x, y, w, h), 'hist': hist, 'img': obj_img, 'motion': mlevel})
+            detections.append({'bbox': (x, y, w, h), 'hist': hist, 'img': obj_img,
+                               'mask': obj_mask, 'motion': mlevel})
 
         for det in detections:
             x, y, w, h = det['bbox']
@@ -910,11 +933,11 @@ class ElarinCore:
                     best_score = score
                     best = mem
             if best is not None and best_score < 0.5:
-                best.update((x, y, w, h), det['hist'], det['img'], det['motion'])
+                best.update((x, y, w, h), det['hist'], det['img'], det['mask'], det['motion'])
             else:
                 oid = self.object_id_counter
                 self.object_id_counter += 1
-                mem = ObjectMemory(oid, det['hist'], det['bbox'], cv2.resize(det['img'], (32, 32)))
+                mem = ObjectMemory(oid, det['hist'], det['bbox'], cv2.resize(det['img'], (32, 32)), det['mask'])
                 mem.center = (cx, cy)
                 mem.positions = [(cx, cy)]
                 mem.motion = det['motion']
@@ -959,6 +982,15 @@ class ElarinCore:
                             img1 = cv2.resize(o1.image, (32,32))
                             img2 = cv2.resize(o2.image, (32,32))
                             o1.image = cv2.addWeighted(img1, w1, img2, w2, 0)
+                        if o1.mask is not None and o2.mask is not None:
+                            new_mask = np.zeros((h, w), dtype=np.uint8)
+                            m1 = cv2.resize(o1.mask, (w1b, h1b))
+                            m2 = cv2.resize(o2.mask, (w2b, h2b))
+                            new_mask[y1 - y:y1 - y + h1b, x1 - x:x1 - x + w1b] = np.maximum(new_mask[y1 - y:y1 - y + h1b, x1 - x:x1 - x + w1b], m1)
+                            new_mask[y2 - y:y2 - y + h2b, x2 - x:x2 - x + w2b] = np.maximum(new_mask[y2 - y:y2 - y + h2b, x2 - x:x2 - x + w2b], m2)
+                            o1.mask = new_mask
+                        else:
+                            o1.mask = None
                         o1.positions.extend(o2.positions)
                         o1.positions = o1.positions[-5:]
                         keep[j] = False
