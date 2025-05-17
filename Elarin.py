@@ -270,6 +270,10 @@ class ElarinCore:
         self._dream_last_switch   = 0.0
         self._dream_duration      = 0.5
 
+        # Imagination panel tracking
+        self._imagination_frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
+        self._imagination_last = 0.0
+
         # Start threads and pygame
         threading.Thread(target=self._voice_updater, daemon=True).start()
         pygame.init()
@@ -474,15 +478,55 @@ class ElarinCore:
         spark ideas about what *could* happen.
         """
 
+        now = time.time()
+
+        # If dream mode is active, play through the dream playlist
+        if self.dreaming:
+            if self._dream_buffer is None:
+                recent = [m for m in self.memory.moments if now - m.time <= 15.0]
+                buf    = [m for m in recent if now - m.time <= 10.0] or recent[-min(len(recent),10):]
+                self._dream_buffer = buf
+                self._dream_playlist = self._build_dream_playlist(buf)
+                self._dream_index    = 0
+                if not self._dream_playlist:
+                    self.dreaming = False
+                    self._dream_buffer = None
+                    return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
+                init_expr = self.memory.moments[-1].expression.astype(np.float32)
+                self._dream_prev_image   = init_expr.copy()
+                target_m = self._dream_playlist[0]
+                self._dream_frame_target = target_m.expression.astype(np.float32)
+                self._dream_last_switch   = now
+                dt = max(0.5, (target_m.time - now)) if target_m.time > now else 0.5
+                self._dream_duration      = dt
+
+            frame = np.clip(self._dream_frame_target, 0, 255).astype(np.uint8)
+            if now - self._dream_last_switch >= self._dream_duration:
+                self._dream_prev_image = self._dream_frame_target
+                self._dream_index = (self._dream_index + 1) % len(self._dream_playlist)
+                next_m = self._dream_playlist[self._dream_index]
+                self._dream_frame_target = next_m.expression.astype(np.float32)
+                self._dream_last_switch  = now
+                dt = max(0.5, (next_m.time - now)) if next_m.time > now else 0.5
+                self._dream_duration     = dt
+            return frame
+
+        # throttle imagination updates to ~2 Hz
+        if now - self._imagination_last < 0.5:
+            return self._imagination_frame
+        self._imagination_last = now
+
         if len(self.memory.moments) < 2:
-            return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
+            self._imagination_frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
+            return self._imagination_frame
 
         # Increase randomness when boredom is high to keep imagination fresh
         boredom = self.state.get("boredom", 0.0)
         rand_chance = min(0.5, boredom / (BOREDOM_THRESHOLD * 2))
         if random.random() < rand_chance and self.memory.moments:
             rand_m = random.choice(self.memory.moments)
-            return rand_m.expression.copy()
+            self._imagination_frame = rand_m.expression.copy()
+            return self._imagination_frame
 
         # Determine creativity level inversely proportional to entropy.
         # 0 → conservative, 1 → highly imaginative
@@ -523,24 +567,29 @@ class ElarinCore:
             if len(cands) == 2:
                 diff = cv2.absdiff(cands[0].expression, cands[1].expression).mean()
                 if diff < 30.0:
-                    return blend_frames([c.expression for c in cands])
+                    self._imagination_frame = blend_frames([c.expression for c in cands])
+                    return self._imagination_frame
                 chosen = random.choice(cands)
-                return chosen.expression.copy()
+                self._imagination_frame = chosen.expression.copy()
+                return self._imagination_frame
             else:
-                return cands[0].expression.copy()
+                self._imagination_frame = cands[0].expression.copy()
+                return self._imagination_frame
 
         # Fallback: sample from memory.  When creativity is high, bias toward
         # older memories, otherwise pick frames with higher entropy.
         if creativity > 0.5:
             idx = random.randint(0, len(self.memory.moments) - 1)
-            return self.memory.moments[idx].expression.copy()
+            self._imagination_frame = self.memory.moments[idx].expression.copy()
+            return self._imagination_frame
 
         threshold = 50.0
         interesting = [m for m in self.memory.moments
                        if m.state.get("entropy", 0.0) > threshold]
         candidates = interesting if interesting else self.memory.moments
         chosen = random.choice(candidates)
-        return chosen.expression.copy()
+        self._imagination_frame = chosen.expression.copy()
+        return self._imagination_frame
 
     def run(self):
         running   = True
@@ -631,46 +680,6 @@ class ElarinCore:
     def _imagine(self, p):
         now = time.time()
 
-        # DREAM MODE
-        if self.dreaming:
-            if self._dream_buffer is None:
-                # build buffer of recent frames
-                recent = [m for m in self.memory.moments if now - m.time <= 15.0]
-                buf    = [m for m in recent if now - m.time <= 10.0] or recent[-min(len(recent),10):]
-                self._dream_buffer = buf
-                # build playlist
-                self._dream_playlist = self._build_dream_playlist(buf)
-                self._dream_index    = 0
-                if not self._dream_playlist:
-                    self.dreaming = False
-                    self._dream_buffer = None
-                    return p['video'], p['video']
-                # initialize prev and target images
-                init_expr = p['video'].astype(np.float32)
-                self._dream_prev_image   = init_expr.copy()
-                target_m = self._dream_playlist[0]
-                self._dream_frame_target = target_m.expression.astype(np.float32)
-                self._dream_last_switch   = now
-                dt = max(0.5, (target_m.time - now)) if target_m.time > now else 0.5
-                self._dream_duration      = dt
-
-            # Display the target frame directly (no cross-fade) to avoid motion blur
-            blended = self._dream_frame_target
-
-            # switch if time
-            if now - self._dream_last_switch >= self._dream_duration:
-                self._dream_prev_image = self._dream_frame_target
-                self._dream_index = (self._dream_index + 1) % len(self._dream_playlist)
-                next_m = self._dream_playlist[self._dream_index]
-                self._dream_frame_target = next_m.expression.astype(np.float32)
-                self._dream_last_switch  = now
-                dt = max(0.5, (next_m.time - now)) if next_m.time > now else 0.5
-                self._dream_duration     = dt
-
-            frame = np.clip(blended, 0, 255).astype(np.uint8)
-            raw = p['video']
-            return raw, frame
-
         # SLEEP MODE
         if self.state['sleeping']:
             frame = sleep_pulse(self.memory.moments)
@@ -751,8 +760,9 @@ class ElarinCore:
         return overlay
 
     def _render(self, frame, predicted):
-        # Generate difference overlay for pending predictions
-        diff_panel_raw = self._consume_prediction_diffs(frame)
+        # Update prediction history and compute immediate diff panel
+        self._consume_prediction_diffs(frame)
+        diff_panel_raw = cv2.absdiff(frame, predicted)
 
         # Base frame shading and audio tint for everything except the
         # primary camera feed.  The left panel (camera feed) is kept
