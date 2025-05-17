@@ -11,10 +11,12 @@ import os
 import random
 import sys
 import json
+from dataclasses import dataclass
 
 FRAME_WIDTH, FRAME_HEIGHT = 640, 480
 AUDIO_SAMPLE_DURATION = 0.1
 MEMORY_FILE = "elarin_memory.pkl"
+OBJECT_MEMORY_DIR = "object_memories"
 INFO_FILE = "elarin_info.json"
 MIN_HEARTBEAT = 0.8
 DECAY_FACTOR = 300.0  # seconds for recency weighting
@@ -140,6 +142,35 @@ class MemoryBank:
         if len(self.moments) > self.maxlen:
             self.moments.pop(0)
 
+class ObjectMemory:
+    def __init__(self, obj_id, hist, bbox, image):
+        self.id = obj_id
+        self.hist = hist
+        self.bbox = bbox  # (x, y, w, h)
+        self.image = image
+        self.count = 1
+        self.positions = [self._center(bbox)]
+        self.motion = 0.0
+        self.last_seen = time.time()
+
+    def _center(self, bbox):
+        x, y, w, h = bbox
+        return (x + w / 2.0, y + h / 2.0)
+
+    def update(self, hist, bbox, image):
+        center = self._center(bbox)
+        if self.positions:
+            dist = np.linalg.norm(np.array(center) - np.array(self.positions[-1]))
+            self.motion = 0.8 * self.motion + 0.2 * dist
+        self.positions.append(center)
+        if len(self.positions) > 5:
+            self.positions.pop(0)
+        self.hist = (self.hist * self.count + hist) / (self.count + 1)
+        self.count += 1
+        self.bbox = bbox
+        self.image = image
+        self.last_seen = time.time()
+
 class VisionFeed:
     def __init__(self, cam_index=0):
         self.cap = cv2.VideoCapture(cam_index)
@@ -246,6 +277,8 @@ class ElarinCore:
         self.entropy_min = float("inf")
         self.entropy_max = float("-inf")
         self.memory = self._load_memory()
+        self.object_memories = self._load_object_memories()
+        self.object_id_counter = (max([m.id for m in self.object_memories], default=0) + 1)
         self.session_start = time.time()
         self.overall_start = self._load_info()
         self.last_status_time = 0
@@ -334,6 +367,23 @@ class ElarinCore:
                     pass
         return MemoryBank()
 
+    def _load_object_memories(self):
+        objs = []
+        if os.path.isdir(OBJECT_MEMORY_DIR):
+            for fn in os.listdir(OBJECT_MEMORY_DIR):
+                if not fn.endswith('.pkl'):
+                    continue
+                path = os.path.join(OBJECT_MEMORY_DIR, fn)
+                try:
+                    with open(path, 'rb') as f:
+                        obj = pickle.load(f)
+                        objs.append(obj)
+                except Exception as e:
+                    print('[Obj-Memory-Load-Error]', e)
+        else:
+            os.makedirs(OBJECT_MEMORY_DIR, exist_ok=True)
+        return objs
+
     def _load_info(self):
         if os.path.exists(INFO_FILE):
             try:
@@ -358,6 +408,17 @@ class ElarinCore:
             except Exception as e:
                 print('[Memory-Save-Error]', e)
         threading.Thread(target=_s, daemon=True).start()
+        self._save_object_memories()
+
+    def _save_object_memories(self):
+        os.makedirs(OBJECT_MEMORY_DIR, exist_ok=True)
+        for obj in self.object_memories:
+            path = os.path.join(OBJECT_MEMORY_DIR, f'obj_{obj.id}.pkl')
+            try:
+                with open(path, 'wb') as f:
+                    pickle.dump(obj, f)
+            except Exception as e:
+                print('[Obj-Memory-Save-Error]', e)
 
     def _update_status(self):
         now = time.time()
@@ -502,7 +563,28 @@ class ElarinCore:
             idx = np.random.choice(len(self.memory.moments), p=probs)
             chosen = self.memory.moments[idx]
 
-        self._imagination_frame = chosen.expression.copy()
+        base = chosen.expression.copy()
+        small = cv2.resize(base, (FRAME_WIDTH//16, FRAME_HEIGHT//16), interpolation=cv2.INTER_LINEAR)
+        frosted = cv2.resize(small, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_NEAREST)
+        img = frosted
+        for obj in self.object_memories:
+            if obj.count < 2 or obj.image is None:
+                continue
+            x,y,w,h = obj.bbox
+            x = max(0, min(FRAME_WIDTH-1, x))
+            y = max(0, min(FRAME_HEIGHT-1, y))
+            w = max(1, min(FRAME_WIDTH - x, w))
+            h = max(1, min(FRAME_HEIGHT - y, h))
+            clarity = min(1.0, obj.count / 10.0) * min(1.0, obj.motion / 2.0 + 0.1)
+            if clarity > 0.5:
+                overlay = cv2.resize(obj.image, (w, h), interpolation=cv2.INTER_CUBIC)
+            else:
+                small = cv2.resize(obj.image, (max(1, w//4), max(1, h//4)), interpolation=cv2.INTER_LINEAR)
+                overlay = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+            roi = img[y:y+h, x:x+w]
+            alpha = 0.3 + 0.7 * clarity
+            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 1-alpha, overlay, alpha, 0)
+        self._imagination_frame = img
         return self._imagination_frame
 
     def run(self):
@@ -630,6 +712,7 @@ class ElarinCore:
             self.memory.moments.pop(0)
         self.memory.add(m)
         self._update_status()
+        self._update_objects(p)
 
     def _consume_prediction_diffs(self, current_frame):
         """Return an overlay showing prediction errors due at this time."""
@@ -663,6 +746,82 @@ class ElarinCore:
                     ).astype(np.uint8)
                     m.expression = blended
         return overlay
+
+    def _update_objects(self, p):
+        motion = p['motion']
+        _, mask = cv2.threshold(motion, 30, 255, cv2.THRESH_BINARY)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in contours:
+            if cv2.contourArea(cnt) < 800:
+                continue
+            x,y,w,h = cv2.boundingRect(cnt)
+            obj_img = p['video'][y:y+h, x:x+w]
+            if obj_img.size == 0:
+                continue
+            hsv = cv2.cvtColor(obj_img, cv2.COLOR_BGR2HSV)
+            hist = cv2.calcHist([hsv], [0,1], None, [8,8], [0,180,0,256])
+            cv2.normalize(hist, hist)
+            hist = hist.flatten()
+            center = (x + w/2.0, y + h/2.0)
+            match = None
+            best = 999.0
+            for mem in self.object_memories:
+                dist = np.linalg.norm(np.array(mem.positions[-1]) - np.array(center)) if mem.positions else 999.0
+                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
+                total = score + dist/100.0
+                if total < best and dist < 100:
+                    best = total
+                    match = mem
+            if match is not None and best < 0.5:
+                match.update(hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
+            else:
+                oid = self.object_id_counter
+                self.object_id_counter += 1
+                mem = ObjectMemory(oid, hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
+                self.object_memories.append(mem)
+        self._merge_objects()
+
+    def _merge_objects(self):
+        objs = self.object_memories
+        keep = [True] * len(objs)
+        for i in range(len(objs)):
+            if not keep[i]:
+                continue
+            o1 = objs[i]
+            for j in range(i+1, len(objs)):
+                if not keep[j]:
+                    continue
+                o2 = objs[j]
+                if len(o1.positions) < 2 or len(o2.positions) < 2:
+                    continue
+                v1 = np.subtract(o1.positions[-1], o1.positions[-2])
+                v2 = np.subtract(o2.positions[-1], o2.positions[-2])
+                if np.linalg.norm(v1 - v2) < 5:
+                    d_now = np.linalg.norm(np.subtract(o1.positions[-1], o2.positions[-1]))
+                    d_prev = np.linalg.norm(np.subtract(o1.positions[-2], o2.positions[-2]))
+                    if abs(d_now - d_prev) < 5 and d_now < 50:
+                        total = o1.count + o2.count
+                        w1 = o1.count / total
+                        w2 = o2.count / total
+                        o1.hist = (o1.hist * w1 + o2.hist * w2)
+                        o1.count = total
+                        o1.motion = max(o1.motion, o2.motion)
+                        x1,y1,w1b,h1b = o1.bbox
+                        x2,y2,w2b,h2b = o2.bbox
+                        x = min(x1, x2)
+                        y = min(y1, y2)
+                        w = max(x1+w1b, x2+w2b) - x
+                        h = max(y1+h1b, y2+h2b) - y
+                        o1.bbox = (x,y,w,h)
+                        if o1.image is not None and o2.image is not None:
+                            img1 = cv2.resize(o1.image, (32,32))
+                            img2 = cv2.resize(o2.image, (32,32))
+                            o1.image = cv2.addWeighted(img1, w1, img2, w2, 0)
+                        o1.positions.extend(o2.positions)
+                        o1.positions = o1.positions[-5:]
+                        keep[j] = False
+        self.object_memories = [o for o,k in zip(objs, keep) if k]
 
     def _render(self, frame, predicted):
         # Update prediction history and compute immediate diff panel
