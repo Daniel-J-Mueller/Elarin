@@ -429,12 +429,12 @@ class ElarinCore:
     def _get_imagination_frame(self):
         """Return a frame from memory representing Elarin's imagination.
 
-        Instead of always pulling the highest-entropy frames (which tended to
-        lock onto the initial moments of a run), try to imagine what might come
-        next based on similar past experiences.  We look for moments in memory
-        that resemble the most recent perception and display the frame that
-        followed each similar moment.  This links memories together and keeps
-        the imagination panel fresh.
+        The imagination panel becomes more adventurous as entropy drops.  At
+        high entropy we stick close to the current trajectory (using the next
+        frames of similar memories).  When entropy is low we draw from older and
+        more distant memories and allow bigger jumps forward or backward in
+        those sequences.  This is not meant to predict the next frame but to
+        spark ideas about what *could* happen.
         """
 
         if len(self.memory.moments) < 2:
@@ -447,26 +447,49 @@ class ElarinCore:
             rand_m = random.choice(self.memory.moments)
             return rand_m.expression.copy()
 
+        # Determine creativity level inversely proportional to entropy.
+        # 0 → conservative, 1 → highly imaginative
+        ent = self.state.get("entropy", 100.0)
+        creativity = max(0.0, min(1.0, 1.0 - ent / 100.0))
+
         # Use the latest moment as the reference point
         last_m = self.memory.moments[-1]
         vec = last_m.vector
-        neighbors = similar_moments(self.memory.moments[:-1], vec, top_n=5)
+        top_n = 5 + int(creativity * 15)
+        neighbors = similar_moments(self.memory.moments[:-1], vec, top_n=top_n)
 
-        # Gather the moments that occurred right after each neighbor
+        # Gather frames adjacent to each neighbor.  The lower the entropy,
+        # the larger the offset we allow when sampling around those neighbors
+        # to produce more imaginative variations.
         next_frames = []
+        max_offset = 1 + int(creativity * 3)
         for n in neighbors:
             try:
                 idx = self.memory.moments.index(n)
-                if idx + 1 < len(self.memory.moments):
-                    next_frames.append(self.memory.moments[idx + 1])
             except ValueError:
                 continue
+            off = random.randint(1, max_offset)
+            for sign in (-1, 1):
+                target = idx + sign * off
+                if 0 <= target < len(self.memory.moments):
+                    next_frames.append(self.memory.moments[target])
+
+        # When very low entropy, also sprinkle in some random distant memories
+        if creativity > 0.5:
+            extra = int(creativity * 5)
+            for _ in range(extra):
+                next_frames.append(random.choice(self.memory.moments))
 
         if next_frames:
             chosen = random.choice(next_frames)
             return chosen.expression.copy()
 
-        # Fallback to high-entropy sampling if no neighbors found
+        # Fallback: sample from memory.  When creativity is high, bias toward
+        # older memories, otherwise pick frames with higher entropy.
+        if creativity > 0.5:
+            idx = random.randint(0, len(self.memory.moments) - 1)
+            return self.memory.moments[idx].expression.copy()
+
         threshold = 50.0
         interesting = [m for m in self.memory.moments
                        if m.state.get("entropy", 0.0) > threshold]
