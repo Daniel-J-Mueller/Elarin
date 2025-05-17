@@ -644,7 +644,7 @@ class ElarinCore:
                 if not self._dream_playlist:
                     self.dreaming = False
                     self._dream_buffer = None
-                    return p['video']
+                    return p['video'], p['video']
                 # initialize prev and target images
                 init_expr = p['video'].astype(np.float32)
                 self._dream_prev_image   = init_expr.copy()
@@ -668,12 +668,14 @@ class ElarinCore:
                 self._dream_duration     = dt
 
             frame = np.clip(blended, 0, 255).astype(np.uint8)
-            return frame, frame
+            raw = p['video']
+            return raw, frame
 
         # SLEEP MODE
         if self.state['sleeping']:
             frame = sleep_pulse(self.memory.moments)
-            return frame, frame
+            raw = p['video']
+            return raw, frame
 
         # AWAKE MODE
         # Use the raw video frame for display to avoid perceived prediction blur
@@ -752,53 +754,23 @@ class ElarinCore:
         # Generate difference overlay for pending predictions
         diff_panel_raw = self._consume_prediction_diffs(frame)
 
-        # Base frame shading and audio tint
-        # Use a fixed overlay brightness to avoid pulsing/flashing
+        # Base frame shading and audio tint for everything except the
+        # primary camera feed.  The left panel (camera feed) is kept
+        # unaltered per user request.
         glow = 128
         def shade(img):
             ov  = np.full_like(img, glow, np.uint8)
             bd  = cv2.addWeighted(img, 0.8, ov, 0.2, 0)
             return np.clip(bd, 0, 255).astype(np.uint8)
-        left  = shade(frame)
+
+        left  = frame.copy()
         right = shade(predicted)
 
         # Audio RMS-based tint
         rms = np.sqrt((self.latest_audio ** 2).mean()) if hasattr(self, 'latest_audio') else 0
         if rms > 0.01:
-            tint_l = np.full_like(left, (rms * 255, 100, 200), np.uint8)
-            left   = cv2.addWeighted(left, 0.95, tint_l, 0.05, 0)
             tint_r = np.full_like(right, (rms * 255, 100, 200), np.uint8)
             right  = cv2.addWeighted(right, 0.95, tint_r, 0.05, 0)
-
-        # Draw audio activity bar
-        bar_h = int(min(1.0, rms * 50) * FRAME_HEIGHT)
-        cv2.rectangle(left, (10, FRAME_HEIGHT - bar_h), (30, FRAME_HEIGHT), (255, 200, 100), -1)
-
-        # --- NEW: Overlay physiological indicators ---
-        # Heart indicator (red circle)
-        # Compute a phase [0,1) based on the heart_rate period
-        heart_period = self.bio.heart_rate  # seconds per beat
-        heart_phase  = (time.time() % heart_period) / heart_period
-        heart_pulse  = 1.0 + 0.2 * (1.0 - abs(heart_phase * 2.0 - 1.0))
-        base_radius  = 15
-        radius_h     = int(base_radius * heart_pulse)
-        cv2.circle(left, (30, 30), radius_h, (0, 0, 255), -1)
-
-        # Lung indicator (blue circle)
-        # Compute breath cycle period and phase
-        # --- With this clamped period for realistic baseline and range ---
-        raw_period     = 1.0 / self.bio.breath_rate   # ideal cycle from bio state
-        min_period     = 2.0    # fastest realistic breath: 1 breath per 2s (30 bpm)
-        max_period     = 5.0    # slowest realistic breath: 1 breath per 5s (12 bpm)
-        breath_period  = min(max_period, max(min_period, raw_period))
-        breath_phase  = (time.time() % breath_period) / breath_period
-        breath_pulse  = 1.0 + 0.2 * (1.0 - abs(breath_phase * 2.0 - 1.0))
-        base_radius   = 15
-        radius_l      = int(base_radius * breath_pulse)
-        cv2.circle(left, (70, 30), radius_l, (255, 0, 0), -1)
-        # -------------------------------------------------
-
-
         # Only one timestamp: countdown to the next prediction
         if self.pending_diffs:
             dt = self.pending_diffs[0]['time'] - time.time()
