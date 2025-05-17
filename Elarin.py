@@ -372,6 +372,7 @@ class ElarinCore:
         status = (
             f"[Status] Memories: {mem_count} | "
             f"Mem Size: {mem_size/1024:.1f} KB | "
+            f"Entropy: {self.state['entropy']:.1f} | "
             f"Session: {sess:.1f}s | Overall: {overall:.1f}s"
         )
         sys.stdout.write('\r' + status + ' ' * 10)
