@@ -252,7 +252,8 @@ class ElarinCore:
         # Start threads and pygame
         threading.Thread(target=self._voice_updater, daemon=True).start()
         pygame.init()
-        self.screen = pygame.display.set_mode((FRAME_WIDTH*2, FRAME_HEIGHT))
+        # Display now uses a 2x2 grid of FRAME_WIDTH x FRAME_HEIGHT panels
+        self.screen = pygame.display.set_mode((FRAME_WIDTH*2, FRAME_HEIGHT*2))
         self.clock  = pygame.time.Clock()
         self.percepts = []
         threading.Thread(target=self._audio_loop, daemon=True).start()
@@ -373,6 +374,19 @@ class ElarinCore:
         else:
             self.predicted_vec = None
             self.predicted_moment = None
+
+    def _get_imagination_frame(self):
+        """Return a frame from memory representing Elarin's imagination."""
+        if not self.memory.moments:
+            return np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
+
+        # Prefer moments with higher entropy for more "interesting" content
+        threshold = 50.0
+        interesting = [m for m in self.memory.moments
+                       if m.state.get("entropy", 0.0) > threshold]
+        candidates = interesting if interesting else self.memory.moments
+        chosen = random.choice(candidates)
+        return chosen.expression.copy()
 
     def run(self):
         running   = True
@@ -592,8 +606,14 @@ class ElarinCore:
         cv2.circle(left, (70, 30), radius_l, (255, 0, 0), -1)
         # -------------------------------------------------
 
-        # Combine left and right panels
-        bd = np.concatenate([left, right], axis=1)
+        # Imagination panel (bottom left) and empty panel (bottom right)
+        imagination = shade(self._get_imagination_frame())
+        empty = np.zeros_like(imagination)
+
+        # Build 2x2 grid
+        top_row = np.concatenate([left, right], axis=1)
+        bottom_row = np.concatenate([imagination, empty], axis=1)
+        bd = np.concatenate([top_row, bottom_row], axis=0)
 
         # Convert to RGB and blit via pygame
         try:
