@@ -242,6 +242,7 @@ class ElarinCore:
         self.prev_entropy = self.state["entropy"]
         self.predicted_vec = None
         self.predicted_moment = None
+        self.predicted_delta = None
         self.bored_start = None
 
         # Vision feed
@@ -393,13 +394,17 @@ class ElarinCore:
         if len(self.memory.moments) < 2:
             self.predicted_vec = None
             self.predicted_moment = None
+            self.predicted_delta = None
             return
         neighbors = similar_moments(self.memory.moments[:-1], curr_vec, top_n=5)
         preds = []
+        deltas = []
         for m in neighbors:
             try:
                 idx = self.memory.moments.index(m)
-                preds.append(self.memory.moments[idx+1].vector)
+                next_m = self.memory.moments[idx+1]
+                preds.append(next_m.vector)
+                deltas.append(next_m.time - m.time)
             except (ValueError, IndexError):
                 continue
         if preds:
@@ -408,9 +413,11 @@ class ElarinCore:
                 self.memory.moments,
                 key=lambda mm: np.linalg.norm(mm.vector - self.predicted_vec)
             )
+            self.predicted_delta = float(np.mean(deltas)) if deltas else None
         else:
             self.predicted_vec = None
             self.predicted_moment = None
+            self.predicted_delta = None
 
     def _get_imagination_frame(self):
         """Return a frame from memory representing Elarin's imagination.
@@ -670,6 +677,16 @@ class ElarinCore:
         radius_l      = int(base_radius * breath_pulse)
         cv2.circle(left, (70, 30), radius_l, (255, 0, 0), -1)
         # -------------------------------------------------
+
+        # Overlay prediction lead time on the predicted frame
+        if self.predicted_delta is not None:
+            text = f"{self.predicted_delta:.2f}s"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            scale = 0.6
+            thick = 1
+            size, _ = cv2.getTextSize(text, font, scale, thick)
+            pos = (FRAME_WIDTH - size[0] - 5, FRAME_HEIGHT - 5)
+            cv2.putText(right, text, pos, font, scale, (255, 255, 255), thick, cv2.LINE_AA)
 
         # Imagination panel (bottom left) and empty panel (bottom right)
         imagination = shade(self._get_imagination_frame())
