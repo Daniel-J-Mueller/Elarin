@@ -484,9 +484,8 @@ class ElarinCore:
                 dt = max(0.5, (target_m.time - now)) if target_m.time > now else 0.5
                 self._dream_duration      = dt
 
-            # blending
-            alpha = min(1.0, (now - self._dream_last_switch) / self._dream_duration)
-            blended = (1-alpha)*self._dream_prev_image + alpha*self._dream_frame_target
+            # Display the target frame directly (no cross-fade) to avoid motion blur
+            blended = self._dream_frame_target
 
             # switch if time
             if now - self._dream_last_switch >= self._dream_duration:
@@ -506,26 +505,22 @@ class ElarinCore:
             frame = sleep_pulse(self.memory.moments)
             return frame, frame
 
-        # AWAKE MODE with salience gating
+        # AWAKE MODE
+        # Use the raw video frame for display to avoid perceived prediction blur
+        raw_vis = p['video'].astype(np.float32)
+
+        # Still generate a feature representation using saliency and motion so
+        # memory and prediction logic remain functional
         sal_cm = cv2.applyColorMap(p['saliency'], cv2.COLORMAP_INFERNO)
         mot_cm = cv2.applyColorMap(p['motion'],  cv2.COLORMAP_OCEAN)
-        # Raw perception blend
-        raw_vis = 0.6 * sal_cm.astype(np.float32) + 0.4 * mot_cm.astype(np.float32)
+        feature_vis = 0.6 * sal_cm.astype(np.float32) + 0.4 * mot_cm.astype(np.float32)
 
-        # Create a temporary moment and vectorize it
-        temp = Moment(now, p, self.state, raw_vis.astype(np.uint8))
+        # Vectorize the temporary moment for similarity search
+        temp = Moment(now, p, self.state, feature_vis.astype(np.uint8))
         vectorize_moment(temp)
 
-        # Find the closest memory match
-        match = similar_moments(self.memory, temp.vector, top_n=1)
-        if match:
-            mem_vis = match[0].expression.astype(np.float32)
-        else:
-            mem_vis = raw_vis
-
-        # Salience gating: high salience trusts perception; low salience favors memory
-        sal = self.bio.salience  # between 0.0 and 1.0
-        vision = sal * raw_vis + (1.0 - sal) * mem_vis
+        # Vision displayed is now the raw camera feed
+        vision = raw_vis
 
         if self.predicted_moment is not None:
             pred_vis = self.predicted_moment.expression.astype(np.float32)
