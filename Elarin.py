@@ -11,10 +11,12 @@ import os
 import random
 import sys
 import json
+from dataclasses import dataclass
 
 FRAME_WIDTH, FRAME_HEIGHT = 640, 480
 AUDIO_SAMPLE_DURATION = 0.1
 MEMORY_FILE = "elarin_memory.pkl"
+OBJECT_MEMORY_DIR = "object_memories"
 INFO_FILE = "elarin_info.json"
 MIN_HEARTBEAT = 0.8
 DECAY_FACTOR = 300.0  # seconds for recency weighting
@@ -140,6 +142,14 @@ class MemoryBank:
         if len(self.moments) > self.maxlen:
             self.moments.pop(0)
 
+class ObjectMemory:
+    def __init__(self, obj_id, hist, bbox, image):
+        self.id = obj_id
+        self.hist = hist
+        self.bbox = bbox  # (x, y, w, h)
+        self.image = image
+        self.count = 1
+
 class VisionFeed:
     def __init__(self, cam_index=0):
         self.cap = cv2.VideoCapture(cam_index)
@@ -246,6 +256,8 @@ class ElarinCore:
         self.entropy_min = float("inf")
         self.entropy_max = float("-inf")
         self.memory = self._load_memory()
+        self.object_memories = self._load_object_memories()
+        self.object_id_counter = (max([m.id for m in self.object_memories], default=0) + 1)
         self.session_start = time.time()
         self.overall_start = self._load_info()
         self.last_status_time = 0
@@ -334,6 +346,23 @@ class ElarinCore:
                     pass
         return MemoryBank()
 
+    def _load_object_memories(self):
+        objs = []
+        if os.path.isdir(OBJECT_MEMORY_DIR):
+            for fn in os.listdir(OBJECT_MEMORY_DIR):
+                if not fn.endswith('.pkl'):
+                    continue
+                path = os.path.join(OBJECT_MEMORY_DIR, fn)
+                try:
+                    with open(path, 'rb') as f:
+                        obj = pickle.load(f)
+                        objs.append(obj)
+                except Exception as e:
+                    print('[Obj-Memory-Load-Error]', e)
+        else:
+            os.makedirs(OBJECT_MEMORY_DIR, exist_ok=True)
+        return objs
+
     def _load_info(self):
         if os.path.exists(INFO_FILE):
             try:
@@ -358,6 +387,17 @@ class ElarinCore:
             except Exception as e:
                 print('[Memory-Save-Error]', e)
         threading.Thread(target=_s, daemon=True).start()
+        self._save_object_memories()
+
+    def _save_object_memories(self):
+        os.makedirs(OBJECT_MEMORY_DIR, exist_ok=True)
+        for obj in self.object_memories:
+            path = os.path.join(OBJECT_MEMORY_DIR, f'obj_{obj.id}.pkl')
+            try:
+                with open(path, 'wb') as f:
+                    pickle.dump(obj, f)
+            except Exception as e:
+                print('[Obj-Memory-Save-Error]', e)
 
     def _update_status(self):
         now = time.time()
@@ -502,7 +542,22 @@ class ElarinCore:
             idx = np.random.choice(len(self.memory.moments), p=probs)
             chosen = self.memory.moments[idx]
 
-        self._imagination_frame = chosen.expression.copy()
+        base = chosen.expression.copy()
+        small = cv2.resize(base, (FRAME_WIDTH//16, FRAME_HEIGHT//16), interpolation=cv2.INTER_LINEAR)
+        frosted = cv2.resize(small, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_NEAREST)
+        img = frosted
+        for obj in self.object_memories:
+            if obj.count < 2 or obj.image is None:
+                continue
+            x,y,w,h = obj.bbox
+            x = max(0, min(FRAME_WIDTH-1, x))
+            y = max(0, min(FRAME_HEIGHT-1, y))
+            w = max(1, min(FRAME_WIDTH - x, w))
+            h = max(1, min(FRAME_HEIGHT - y, h))
+            overlay = cv2.resize(obj.image, (w,h))
+            roi = img[y:y+h, x:x+w]
+            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
+        self._imagination_frame = img
         return self._imagination_frame
 
     def run(self):
@@ -630,6 +685,7 @@ class ElarinCore:
             self.memory.moments.pop(0)
         self.memory.add(m)
         self._update_status()
+        self._update_objects(p)
 
     def _consume_prediction_diffs(self, current_frame):
         """Return an overlay showing prediction errors due at this time."""
@@ -663,6 +719,40 @@ class ElarinCore:
                     ).astype(np.uint8)
                     m.expression = blended
         return overlay
+
+    def _update_objects(self, p):
+        motion = p['motion']
+        _, mask = cv2.threshold(motion, 30, 255, cv2.THRESH_BINARY)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in contours:
+            if cv2.contourArea(cnt) < 800:
+                continue
+            x,y,w,h = cv2.boundingRect(cnt)
+            obj_img = p['video'][y:y+h, x:x+w]
+            if obj_img.size == 0:
+                continue
+            hsv = cv2.cvtColor(obj_img, cv2.COLOR_BGR2HSV)
+            hist = cv2.calcHist([hsv], [0,1], None, [8,8], [0,180,0,256])
+            cv2.normalize(hist, hist)
+            hist = hist.flatten()
+            match = None
+            best = 1.0
+            for mem in self.object_memories:
+                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
+                if score < best:
+                    best = score
+                    match = mem
+            if match is not None and best < 0.3:
+                match.hist = (match.hist * match.count + hist) / (match.count + 1)
+                match.count += 1
+                match.bbox = (x,y,w,h)
+                match.image = cv2.resize(obj_img, (32,32))
+            else:
+                oid = self.object_id_counter
+                self.object_id_counter += 1
+                mem = ObjectMemory(oid, hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
+                self.object_memories.append(mem)
 
     def _render(self, frame, predicted):
         # Update prediction history and compute immediate diff panel
