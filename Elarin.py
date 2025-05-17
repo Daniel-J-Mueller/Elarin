@@ -595,19 +595,27 @@ class ElarinCore:
         # Boredom from low entropy change
         d_ent = abs(self.state['entropy'] - self.prev_entropy)
         if d_ent < BORING_DELTA:
-            self.state['boredom'] += 0.1
+            self.state['boredom'] += 0.05
         else:
             self.state['boredom'] = max(0.0, self.state['boredom'] - 0.05)
         self.prev_entropy = self.state['entropy']
         if self.state['satisfaction'] > 0.8:
             self.state['boredom'] = max(0.0, self.state['boredom'] - 0.2)
 
-        # Dreaming triggered by boredom
-        if self.state['boredom'] > BOREDOM_THRESHOLD and not self.dreaming and not self.state['sleeping']:
+        # Integrate BioState: stimuli_intensity from normalized entropy
+        entropy_norm   = self.state['entropy'] / 100.0
+        audio_level    = np.sqrt((p['audio'] ** 2).mean())         # approx 0–1
+        motion_level   = np.mean(p['motion']) / 255.0              # approx 0–1
+        # Use the strongest signal to drive physiology
+        stimuli_intensity = min(1.0, max(entropy_norm, audio_level, motion_level))
+
+        # Dreaming triggered by boredom only when stimuli are very low
+        low_stim = stimuli_intensity < 0.15
+        if self.state['boredom'] > BOREDOM_THRESHOLD and not self.dreaming and not self.state['sleeping'] and low_stim:
             self.dreaming = True
             self._dream_buffer = None
             self._dream_playlist = None
-        elif self.dreaming and self.state['boredom'] <= BOREDOM_THRESHOLD:
+        elif self.dreaming and (self.state['boredom'] <= BOREDOM_THRESHOLD or not low_stim):
             self.dreaming = False
             self._dream_current = None
 
@@ -616,14 +624,8 @@ class ElarinCore:
 
         # Update restfulness
         update_biological_state(self.state)
-        
-        # Integrate BioState: stimuli_intensity from normalized entropy
-        # Dynamic stimuli intensity based on entropy, audio, and motion
-        entropy_norm   = self.state['entropy'] / 100.0
-        audio_level    = np.sqrt((p['audio'] ** 2).mean())         # approx 0–1
-        motion_level   = np.mean(p['motion']) / 255.0              # approx 0–1
-        # Use the strongest signal to drive physiology
-        stimuli_intensity = min(1.0, max(entropy_norm, audio_level, motion_level))
+
+        # Apply physiological response
         self.bio.update(stimuli_intensity)
 
     def _imagine(self, p):
