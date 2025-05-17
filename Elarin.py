@@ -584,6 +584,9 @@ class ElarinCore:
             roi = img[y:y+h, x:x+w]
             alpha = 0.3 + 0.7 * clarity
             img[y:y+h, x:x+w] = cv2.addWeighted(roi, 1-alpha, overlay, alpha, 0)
+            overlay = cv2.resize(obj.image, (w,h))
+            roi = img[y:y+h, x:x+w]
+            img[y:y+h, x:x+w] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
         self._imagination_frame = img
         return self._imagination_frame
 
@@ -775,6 +778,18 @@ class ElarinCore:
                     match = mem
             if match is not None and best < 0.5:
                 match.update(hist, (x,y,w,h), cv2.resize(obj_img, (32,32)))
+            match = None
+            best = 1.0
+            for mem in self.object_memories:
+                score = cv2.compareHist(mem.hist.astype(np.float32), hist.astype(np.float32), cv2.HISTCMP_BHATTACHARYYA)
+                if score < best:
+                    best = score
+                    match = mem
+            if match is not None and best < 0.3:
+                match.hist = (match.hist * match.count + hist) / (match.count + 1)
+                match.count += 1
+                match.bbox = (x,y,w,h)
+                match.image = cv2.resize(obj_img, (32,32))
             else:
                 oid = self.object_id_counter
                 self.object_id_counter += 1
