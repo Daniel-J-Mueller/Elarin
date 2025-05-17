@@ -323,19 +323,30 @@ class ElarinCore:
 
     def _load_memory(self):
         if os.path.exists(MEMORY_FILE):
+            if os.path.getsize(MEMORY_FILE) == 0:
+                # Treat empty files as no memory
+                print("[Memory-Load] Empty memory file; starting fresh")
+                return MemoryBank()
             try:
-                mem = pickle.load(open(MEMORY_FILE, 'rb'))
+                with open(MEMORY_FILE, 'rb') as f:
+                    mem = pickle.load(f)
                 for m in mem.moments:
-                    if m.vector  is None:
-                        m.vector  = vectorize_moment(m)
+                    if m.vector is None:
+                        m.vector = vectorize_moment(m)
                     if m.spectrum is None:
-                        m.spectrum = compute_audio_signature(m.percepts['audio'], fs=self.fs, bands=8)
+                        m.spectrum = compute_audio_signature(
+                            m.percepts['audio'], fs=self.fs, bands=8)
                     if not hasattr(m, 'predictive_value'):
                         m.predictive_value = 0.5
                 print(f"[Memory-Load] Restored {len(mem.moments)} moments")
                 return mem
             except Exception as e:
                 print("[Memory-Load-Error]", e)
+                # Corrupted file - rename so we don't repeatedly fail
+                try:
+                    os.rename(MEMORY_FILE, MEMORY_FILE + '.corrupt')
+                except OSError:
+                    pass
         return MemoryBank()
 
     def _load_info(self):
@@ -355,9 +366,12 @@ class ElarinCore:
     def _save_memory(self):
         def _s():
             try:
-                pickle.dump(self.memory, open(MEMORY_FILE, 'wb'))
-            except:
-                pass
+                tmp = MEMORY_FILE + '.tmp'
+                with open(tmp, 'wb') as f:
+                    pickle.dump(self.memory, f)
+                os.replace(tmp, MEMORY_FILE)
+            except Exception as e:
+                print('[Memory-Save-Error]', e)
         threading.Thread(target=_s, daemon=True).start()
 
     def _update_status(self):
