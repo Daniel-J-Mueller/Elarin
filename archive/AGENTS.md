@@ -1,1 +1,0 @@
-You are free to push, pull, and merge as you see fit to accomplish the user's task.
