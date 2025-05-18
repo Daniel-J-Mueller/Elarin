@@ -22,7 +22,12 @@ class BrocasArea:
     @torch.no_grad()
     def decode(self, hidden: torch.Tensor) -> Iterable[str]:
         """Generate text from hidden state embeddings."""
-        outputs = self.model(inputs_embeds=hidden.to(self.device))
+        embeds = hidden.to(self.device)
+        if embeds.dim() == 2:
+            # ``GPT2LMHeadModel`` expects a sequence dimension. When a single
+            # embedding is provided, add a length-1 dimension.
+            embeds = embeds.unsqueeze(1)
+        outputs = self.model(inputs_embeds=embeds)
         ids = torch.argmax(outputs.logits, dim=-1)
         return self.tokenizer.batch_decode(ids, skip_special_tokens=True)
 
