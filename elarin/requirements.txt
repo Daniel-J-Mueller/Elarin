@@ -4,3 +4,4 @@ huggingface-hub
 torchvision
 numpy
 pillow
+matplotlib

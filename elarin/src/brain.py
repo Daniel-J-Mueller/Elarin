@@ -11,7 +11,7 @@ from .motor_cortex import MotorCortex
 from .thalamus import Thalamus
 from .utils.config import load_config
 from .utils.logger import get_logger
-from .viewer import render
+from .viewer import render, show
 
 
 def main() -> None:
@@ -60,7 +60,7 @@ def main() -> None:
     out_text = motor.act(context)
 
     frame = render(img, out_text)
-    frame.show()
+    show(frame)
     logger.info("demo complete")
 
 
