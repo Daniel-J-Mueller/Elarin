@@ -9,9 +9,11 @@ from torch import nn
 class Trainer:
     """Very small placeholder trainer implementing simple Hebbian-like updates."""
 
-    def __init__(self, lr: float = 1e-4, decay: float = 0.999):
+    def __init__(self, lr: float = 1e-4, decay: float = 0.999, novelty_alpha: float = 0.9):
         self.lr = lr
         self.decay = decay
+        self.novelty_alpha = novelty_alpha
+        self._prev_activation: torch.Tensor | None = None
 
     @torch.no_grad()
     def step(self, modules: Iterable[nn.Module], activations: torch.Tensor) -> None:
@@ -26,6 +28,20 @@ class Trainer:
         """
         outer = torch.einsum("bi,bj->ij", activations, activations)
         act = activations.squeeze(0)
+
+        # Compute novelty based on similarity to recent activation
+        novelty = 1.0
+        if self._prev_activation is not None:
+            sim = torch.nn.functional.cosine_similarity(act, self._prev_activation, dim=0)
+            novelty = float(1.0 - sim.clamp(min=0.0).item())
+
+            # Update running average of activation
+            self._prev_activation.mul_(self.novelty_alpha)
+            self._prev_activation.add_((1.0 - self.novelty_alpha) * act)
+        else:
+            self._prev_activation = act.clone()
+
+        scaled_lr = self.lr * novelty
         for module in modules:
             for p in module.parameters():
                 if not p.requires_grad:
@@ -35,11 +51,11 @@ class Trainer:
 
                 if p.ndim == 1:
                     length = min(p.shape[0], act.shape[0])
-                    p[:length].add_(self.lr * act[:length])
+                    p[:length].add_(scaled_lr * act[:length])
                 else:
                     rows = min(p.shape[0], outer.shape[0])
                     cols = min(p.shape[1], outer.shape[1])
-                    p[:rows, :cols].add_(self.lr * outer[:rows, :cols])
+                    p[:rows, :cols].add_(scaled_lr * outer[:rows, :cols])
 
 
 if __name__ == "__main__":
