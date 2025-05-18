@@ -5,9 +5,9 @@ from torch import nn
 
 
 class ContextCortex(nn.Module):
-    """Simple GRU-based context representation."""
+    """GRU-based context representation."""
 
-    def __init__(self, input_dim: int = 256, hidden_dim: int = 256, device: str = "cpu"):
+    def __init__(self, input_dim: int = 768, hidden_dim: int = 1024, device: str = "cpu") -> None:
         super().__init__()
         self.gru = nn.GRU(input_dim, hidden_dim, batch_first=True)
         self.hidden = torch.zeros(1, 1, hidden_dim, device=device)
