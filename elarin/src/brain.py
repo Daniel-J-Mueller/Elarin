@@ -3,6 +3,10 @@
 from PIL import Image
 import torch
 import time
+import cv2
+import sounddevice as sd
+import numpy as np
+import whisper
 
 from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
@@ -37,15 +41,29 @@ def main() -> None:
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
 
+    cam = cv2.VideoCapture(0)
+    asr = whisper.load_model(models["whisper"])
+
     try:
         while True:
-            # placeholder sensory capture
-            img = Image.new("RGB", (224, 224), color="white")
+            ret, frame_bgr = cam.read()
+            if not ret:
+                logger.warning("camera frame not captured")
+                img = Image.new("RGB", (224, 224), color="white")
+            else:
+                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(frame_rgb).resize((224, 224))
+
             vision_emb = retina.encode([img]).to(devices["occipital_lobe"])
             vision_feat = occipital.process(vision_emb)
             thalamus.submit("vision", vision_feat)
 
-            text_emb = wernicke.encode(["hello world"]).mean(dim=1)
+            audio_samples = sd.rec(int(1.0 * 16000), samplerate=16000, channels=1)
+            sd.wait()
+            audio_np = audio_samples.squeeze().astype(np.float32)
+            result = asr.transcribe(audio_np, language="en", fp16=False)
+            spoken = result.get("text", "")
+            text_emb = wernicke.encode([spoken]).mean(dim=1)
             thalamus.submit("audio", text_emb)
 
             vision = thalamus.relay("vision")
