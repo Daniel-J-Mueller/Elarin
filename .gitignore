@@ -10,3 +10,7 @@ elarin/models/gpt2
 elarin/models/whisper-small
 elarin/data/replay_buffer
 archive
+elarin/src/utils/__pycache__
+elarin/src/sensors/__pycache__
+elarin/src/language_areas/__pycache__
+elarin/src/__pycache__
