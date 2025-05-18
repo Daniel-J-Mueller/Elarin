@@ -20,9 +20,13 @@ def render(frame: Union[Image.Image, np.ndarray], text: str = "") -> Image.Image
 
 
 def show(image: Image.Image) -> None:
-    """Display an image in a small matplotlib window."""
+    """Display an image in a small matplotlib window.
+
+    Successive calls reuse the same figure so it can be updated in a loop.
+    """
     plt.figure("Elarin Viewer")
     plt.imshow(image)
     plt.axis("off")
-    plt.show(block=False)
+    plt.draw()
+    plt.pause(0.001)
 
