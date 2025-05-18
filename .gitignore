@@ -14,3 +14,6 @@ elarin/src/utils/__pycache__
 elarin/src/sensors/__pycache__
 elarin/src/language_areas/__pycache__
 elarin/src/__pycache__
+elarin/persistent
+persistent/hippocampus.npy
+persistent/motor.pt
