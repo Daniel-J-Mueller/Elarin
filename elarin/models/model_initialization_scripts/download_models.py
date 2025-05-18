@@ -21,13 +21,27 @@ MODELS: Dict[str, str] = {
 
 
 def download_model(repo_id: str, target_dir: Path) -> None:
-    """Download ``repo_id`` into ``target_dir`` if it does not already exist."""
-    if target_dir.exists():
+    """Download ``repo_id`` into ``target_dir`` if needed.
+
+    Directories that already contain files are considered complete and will be
+    skipped. Empty directories (which sometimes exist due to manual creation or
+    aborted downloads) will be populated.
+    """
+
+    if target_dir.exists() and any(target_dir.iterdir()):
         print(f"[skip] {target_dir} already present")
         return
 
-    print(f"[download] {repo_id} -> {target_dir}")
-    snapshot_download(repo_id=repo_id, local_dir=target_dir, local_dir_use_symlinks=False)
+    if target_dir.exists():
+        print(f"[download] {repo_id} -> {target_dir} (was empty)")
+    else:
+        print(f"[download] {repo_id} -> {target_dir}")
+
+    snapshot_download(
+        repo_id=repo_id,
+        local_dir=target_dir,
+        local_dir_use_symlinks=False,
+    )
 
 
 def download_all(root: Path) -> None:
