@@ -58,7 +58,7 @@ def main() -> None:
     axis = HypothalamusPituitaryAxis()
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
-        persist_path=f"{persist_dir}/augmenter.pt",
+        persist_path=f"{persist_dir}/angular_gyrus.pt",
     )
     motor = MotorCortex(
         models["gpt2"],
@@ -156,7 +156,7 @@ def main() -> None:
 
             context = dmn(vision, audio, intero)
             recalled = hippocampus.query(
-                "context", context.squeeze(0).cpu().numpy(), k=5
+                "context", context.squeeze(0).detach().cpu().numpy(), k=5
             )
             if recalled:
                 if "context" in recalled:
@@ -174,11 +174,11 @@ def main() -> None:
 
             hippocampus.add_episode(
                 {
-                    "vision": vision.squeeze(0).cpu().numpy(),
-                    "audio": audio.squeeze(0).cpu().numpy(),
-                    "intero": intero.squeeze(0).cpu().numpy(),
-                    "context": context.squeeze(0).cpu().numpy(),
-                    "motor": out_aug.squeeze(0).cpu().numpy(),
+                    "vision": vision.squeeze(0).detach().cpu().numpy(),
+                    "audio": audio.squeeze(0).detach().cpu().numpy(),
+                    "intero": intero.squeeze(0).detach().cpu().numpy(),
+                    "context": context.squeeze(0).detach().cpu().numpy(),
+                    "motor": out_aug.squeeze(0).detach().cpu().numpy(),
                 }
             )
             thalamus.submit("intero", out_aug)
@@ -201,7 +201,7 @@ def main() -> None:
             if taught:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
-                hippocampus.add_episode({"motor": teach_emb.squeeze(0).cpu().numpy()})
+                hippocampus.add_episode({"motor": teach_emb.squeeze(0).detach().cpu().numpy()})
                 thalamus.submit("intero", teach_emb)
                 trainer.step(
                     [dmn.fusion, motor.area.model.transformer, augmenter],
