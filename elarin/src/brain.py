@@ -100,12 +100,25 @@ def main() -> None:
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
             inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
             input_features = inputs.input_features.to(asr_device)
+            attention_mask = inputs.attention_mask.to(asr_device)
+            prompt_ids = asr_processor.get_decoder_prompt_ids(
+                language="en", task="transcribe"
+            )
             predicted_ids = asr_model.generate(
                 input_features,
+                attention_mask=attention_mask,
+                forced_decoder_ids=prompt_ids,
                 max_new_tokens=16,
             )
-            spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
-            text_emb = wernicke.encode([spoken]).mean(dim=1)
+            spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
+            if spoken:
+                text_emb = wernicke.encode([spoken]).mean(dim=1)
+            else:
+                text_emb = torch.zeros(
+                    1,
+                    wernicke.model.config.n_embd,
+                    device=wernicke.device,
+                )
             thalamus.submit("audio", text_emb)
 
             vision = thalamus.relay("vision")
