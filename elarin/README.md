@@ -16,6 +16,7 @@ elarin/
 ├── configs/                  # hyperparameters and paths
 ├── models/                   # offline model checkpoints
 │   └── model_initialization_scripts/
+├── persistent/              # snapshots of memory and adapter weights
 ├── scripts/                  # launchers for each brain region service
 └── src/                      # implementation of each region
 ```
@@ -98,3 +99,7 @@ test that loads the decapitated models, fuses a dummy image with text and
 prints the motor cortex output. A viewer window powered by ``pygame``
 displays the live camera feed with an audio level meter and text overlay.
 Press ``Ctrl+C`` to end the demo.
+
+All learned memories and adapter weights are automatically written to the
+``persistent/`` directory so progress can be resumed on the next launch.
+Removing that directory resets the brain back to its initial state.

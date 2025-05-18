@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+from pathlib import Path
 
 import numpy as np
 
@@ -10,11 +12,17 @@ import numpy as np
 class Hippocampus:
     """Episodic memory storing embeddings for multiple modalities."""
 
-    def __init__(self, dims: Dict[str, int], capacity: int = 1000) -> None:
+    def __init__(self, dims: Dict[str, int], capacity: int = 1000, persist_path: Optional[str] = None) -> None:
         self.dims = dims
         self.capacity = capacity
         # Each entry in ``memory`` is a mapping ``modality -> embedding``
         self.memory: List[Dict[str, np.ndarray]] = []
+        self.persist_path = Path(persist_path) if persist_path else None
+        if self.persist_path and self.persist_path.exists():
+            try:
+                self.memory = np.load(self.persist_path, allow_pickle=True).tolist()
+            except Exception:
+                self.memory = []
 
     def add_episode(self, episode: Dict[str, np.ndarray]) -> None:
         """Store a set of embeddings for different modalities."""
@@ -67,3 +75,10 @@ class Hippocampus:
     def clear(self) -> None:
         """Remove all stored episodes."""
         self.memory.clear()
+
+    def save(self) -> None:
+        """Persist memory to disk if ``persist_path`` is set."""
+        if not self.persist_path:
+            return
+        self.persist_path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(self.persist_path, np.array(self.memory, dtype=object), allow_pickle=True)

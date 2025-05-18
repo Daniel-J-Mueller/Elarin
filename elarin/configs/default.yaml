@@ -18,3 +18,6 @@ models:
   clip: models/clip-vit-b32
   whisper: models/whisper-small
   gpt2: models/gpt2
+
+# Directory for saving learned state
+persistent_dir: persistent

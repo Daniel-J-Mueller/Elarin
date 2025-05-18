@@ -38,6 +38,7 @@ class WernickesArea:
             list(texts),
             return_tensors="pt",
             padding=True,
+            truncation=True,
         ).to(self.device)
         outputs = self.model(**tokens)
         hidden = outputs.last_hidden_state
