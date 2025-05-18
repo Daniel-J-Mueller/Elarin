@@ -40,9 +40,15 @@ class MotorCortex:
             iter(self.area.decode(hidden.to(self.device), temperature=temp))
         )
         self.logger.info(text)
-        # Feed back only the embedding of the generated token itself to avoid
-        # context saturation.
-        loop_emb = self.wernicke.encode([text])[:, -1]
+        # Convert the generated token back to its ID and pull the corresponding
+        # embedding directly from Wernicke's input layer so that only the most
+        # recent token influences the next context step.
+        tok_id = self.wernicke.tokenizer(
+            text,
+            add_special_tokens=False,
+            return_tensors="pt",
+        ).input_ids.to(self.wernicke.device)[0, -1]
+        loop_emb = self.wernicke.model.get_input_embeddings()(tok_id.unsqueeze(0))
         return text, loop_emb
 
     @torch.no_grad()
