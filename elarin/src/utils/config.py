@@ -25,4 +25,15 @@ def load_config(path: str) -> Dict[str, Any]:
         cfg_path = BASE_DIR / cfg_path
 
     with cfg_path.open("r") as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f)
+
+    def resolve(p: str) -> str:
+        path = Path(p)
+        if not path.is_absolute():
+            path = BASE_DIR / path
+        return str(path)
+
+    if "models" in cfg:
+        cfg["models"] = {k: resolve(v) for k, v in cfg["models"].items()}
+
+    return cfg
