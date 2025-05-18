@@ -12,6 +12,12 @@ class WernickesArea:
 
     def __init__(self, model_dir: str, device: str = "cpu"):
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_dir)
+        # ``GPT2Tokenizer`` does not define a padding token by default which
+        # breaks batching when ``padding=True`` is requested.  Use the EOS token
+        # as padding to keep sequence length consistent across calls.
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
         self.model = GPT2Model.from_pretrained(model_dir)
         self.model.to(device)
         self.model.eval()
