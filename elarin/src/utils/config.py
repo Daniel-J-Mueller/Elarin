@@ -2,6 +2,10 @@ import yaml
 from pathlib import Path
 from typing import Any, Dict
 
+# Base directory of the ``elarin`` package. Configuration files are stored
+# relative to this path.
+BASE_DIR = Path(__file__).resolve().parents[2]
+
 
 def load_config(path: str) -> Dict[str, Any]:
     """Load a YAML configuration file.
@@ -17,5 +21,8 @@ def load_config(path: str) -> Dict[str, Any]:
         Parsed configuration dictionary.
     """
     cfg_path = Path(path)
+    if not cfg_path.is_absolute():
+        cfg_path = BASE_DIR / cfg_path
+
     with cfg_path.open("r") as f:
         return yaml.safe_load(f)
