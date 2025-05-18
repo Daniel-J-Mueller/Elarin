@@ -25,3 +25,12 @@ class Hippocampus:
         scores = [float(np.dot(emb, m) / (np.linalg.norm(emb) * np.linalg.norm(m) + 1e-8)) for m in self.memory]
         idx = np.argsort(scores)[-k:][::-1]
         return [self.memory[i] for i in idx]
+
+    def decay(self, rate: float = 0.99) -> None:
+        """Gradually weaken all stored embeddings."""
+        for i, m in enumerate(self.memory):
+            self.memory[i] = m * rate
+
+    def clear(self) -> None:
+        """Remove all stored memories."""
+        self.memory.clear()
