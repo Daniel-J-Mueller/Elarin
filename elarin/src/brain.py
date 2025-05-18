@@ -30,6 +30,11 @@ def main() -> None:
     devices = cfg["devices"]
     models = cfg["models"]
     persist_dir = Path(cfg.get("persistent_dir", "persistent"))
+    settings = cfg.get("settings", {})
+    loop_interval = float(settings.get("loop_interval", 0.05))
+    audio_duration = float(settings.get("audio_duration", 1.0))
+    debug_no_video = bool(settings.get("debug_no_video", False))
+    hippocampus_capacity = int(settings.get("hippocampus_capacity", 1000))
 
     if not persist_dir.is_absolute():
         from .utils.config import BASE_DIR
@@ -53,6 +58,7 @@ def main() -> None:
             "context": 768,
             "motor": 768,
         },
+        capacity=hippocampus_capacity,
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
@@ -75,8 +81,11 @@ def main() -> None:
     dmn_device = devices["dmn"]
 
 
-    cam = Camera()
-    viewer = Viewer(224, 224)
+    cam = None
+    viewer = None
+    if not debug_no_video:
+        cam = Camera()
+        viewer = Viewer(224, 224)
     asr_processor = WhisperProcessor.from_pretrained(models["whisper"])
     asr_model = WhisperForConditionalGeneration.from_pretrained(models["whisper"])
     asr_device = devices.get("cochlea", "cpu")
@@ -85,20 +94,24 @@ def main() -> None:
 
     try:
         while True:
-            frame_bgr = cam.read()
-            if frame_bgr is None:
-                logger.warning("camera frame not captured")
-                img = Image.new("RGB", (224, 224), color="white")
-                frame_rgb = np.array(img)
+            if not debug_no_video:
+                frame_bgr = cam.read()
+                if frame_bgr is None:
+                    logger.warning("camera frame not captured")
+                    img = Image.new("RGB", (224, 224), color="white")
+                    frame_rgb = np.array(img)
+                else:
+                    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                    img = Image.fromarray(frame_rgb).resize((224, 224))
+
+                vision_emb = retina.encode([img]).to(devices["occipital_lobe"])
+                vision_feat = occipital.process(vision_emb)
+                thalamus.submit("vision", vision_feat)
             else:
-                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-                img = Image.fromarray(frame_rgb).resize((224, 224))
+                frame_rgb = np.zeros((224, 224, 3), dtype=np.uint8)
+                vision_feat = torch.zeros(1, 128, device=devices["occipital_lobe"])
 
-            vision_emb = retina.encode([img]).to(devices["occipital_lobe"])
-            vision_feat = occipital.process(vision_emb)
-            thalamus.submit("vision", vision_feat)
-
-            audio_samples = sd.rec(int(1.0 * 16000), samplerate=16000, channels=1)
+            audio_samples = sd.rec(int(audio_duration * 16000), samplerate=16000, channels=1)
             sd.wait()
             audio_np = audio_samples.squeeze().astype(np.float32)
             # Compute a simple RMS volume estimate and boost the gain for display
@@ -196,8 +209,11 @@ def main() -> None:
 
             hippocampus.decay()
 
-            viewer.update(frame_rgb, out_text, audio_level)
-            taught = viewer.poll_text_input()
+            if viewer:
+                viewer.update(frame_rgb, out_text, audio_level)
+                taught = viewer.poll_text_input()
+            else:
+                taught = None
             if taught:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
@@ -208,12 +224,14 @@ def main() -> None:
                     teach_emb,
                     lr_scale=2.0,
                 )
-            time.sleep(0.05)
+            time.sleep(loop_interval)
     except KeyboardInterrupt:
         logger.info("demo interrupted")
     finally:
-        cam.release()
-        viewer.close()
+        if cam:
+            cam.release()
+        if viewer:
+            viewer.close()
         hippocampus.save()
         motor.save()
         augmenter.save()
