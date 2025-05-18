@@ -5,3 +5,8 @@ elarin_info.json
 elarin_memory.pkl.corrupt
 elarin_memory.pkl.tmp
 object_memories
+elarin/models/clip-vit-b32
+elarin/models/gpt2
+elarin/models/whisper-small
+elarin/data/replay_buffer
+archive
