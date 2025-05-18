@@ -100,15 +100,24 @@ def main() -> None:
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
             inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
             input_features = inputs.input_features.to(asr_device)
-            attention_mask = inputs.attention_mask.to(asr_device)
+            attention_mask = getattr(inputs, "attention_mask", None)
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(asr_device)
+
             prompt_ids = asr_processor.get_decoder_prompt_ids(
                 language="en", task="transcribe"
             )
+
+            generation_args = {
+                "forced_decoder_ids": prompt_ids,
+                "max_new_tokens": 16,
+            }
+            if attention_mask is not None:
+                generation_args["attention_mask"] = attention_mask
+
             predicted_ids = asr_model.generate(
                 input_features,
-                attention_mask=attention_mask,
-                forced_decoder_ids=prompt_ids,
-                max_new_tokens=16,
+                **generation_args,
             )
             spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
             if spoken:
