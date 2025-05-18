@@ -197,7 +197,7 @@ This file is the single source of truth for Elarin’s experiential architecture
 - **Vision**: `clip-vit-base-patch32` (85 M)  
 - **Audio**: `whisper-small` (244 M)  
 - **LLM Core**: `gpt2` (117 M → split 6/6)  
-- **Fusion & Cortex Experts**: custom Transformer/MLP (~10 M)  
+- **Fusion & Cortex Experts**: custom Transformer/MLP (~50 M)
 - **Adapters**: LoRA via `peft` for each module  
 - **Indexing**: FAISS flat (no learnable weights)
 

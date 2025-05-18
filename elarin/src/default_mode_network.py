@@ -9,19 +9,32 @@ from torch import nn
 class DefaultModeNetwork(nn.Module):
     """Fuse sensory embeddings and produce routed context vectors."""
 
-    def __init__(self, vision_dim: int = 128, audio_dim: int = 768, intero_dim: int = 64, hidden_dim: int = 768):
-        # ``audio_dim`` defaults to 768 to match the hidden size of GPT-2 used
-        # in :class:`WernickesArea`. ``hidden_dim`` is likewise 768 so the
-        # resulting context can be fed directly to :class:`BrocasArea` without
-        # additional projection.
+    def __init__(
+        self,
+        vision_dim: int = 128,
+        audio_dim: int = 768,
+        intero_dim: int = 64,
+        hidden_dim: int = 2048,
+        output_dim: int = 768,
+        num_layers: int = 4,
+    ) -> None:
+        """Create a larger fusion network.
+
+        ``audio_dim`` defaults to 768 to match the hidden size of GPT-2 used in
+        :class:`WernickesArea`. ``output_dim`` is likewise 768 so the resulting
+        context can be fed directly to :class:`BrocasArea` without additional
+        projection.
+        """
+
         super().__init__()
         fusion_in = vision_dim + audio_dim + intero_dim
         self.fusion = nn.Linear(fusion_in, hidden_dim)
-        self.router = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-        )
+
+        layers = []
+        for _ in range(num_layers - 1):
+            layers.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
+        layers.append(nn.Linear(hidden_dim, output_dim))
+        self.router = nn.Sequential(*layers)
 
     @torch.no_grad()
     def forward(self, vision: torch.Tensor, audio: torch.Tensor, intero: torch.Tensor) -> torch.Tensor:
