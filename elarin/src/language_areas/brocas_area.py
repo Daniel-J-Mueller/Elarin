@@ -12,15 +12,17 @@ class BrocasArea:
     ``AGENTS.md``.
     """
 
-    def __init__(self, model_dir: str):
+    def __init__(self, model_dir: str, device: str = "cpu"):
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_dir)
         self.model = GPT2LMHeadModel.from_pretrained(model_dir)
+        self.model.to(device)
         self.model.eval()
+        self.device = device
 
     @torch.no_grad()
     def decode(self, hidden: torch.Tensor) -> Iterable[str]:
         """Generate text from hidden state embeddings."""
-        outputs = self.model(inputs_embeds=hidden)
+        outputs = self.model(inputs_embeds=hidden.to(self.device))
         ids = torch.argmax(outputs.logits, dim=-1)
         return self.tokenizer.batch_decode(ids, skip_special_tokens=True)
 
