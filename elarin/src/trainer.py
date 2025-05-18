@@ -60,7 +60,25 @@ class Trainer:
                 else:
                     rows = min(p.shape[0], outer.shape[0])
                     cols = min(p.shape[1], outer.shape[1])
-                    p[:rows, :cols].add_(scaled_lr * outer.to(p.device)[:rows, :cols])
+                    p[:rows, :cols].add_(
+                        scaled_lr * outer.to(p.device)[:rows, :cols]
+                    )
+
+    @torch.no_grad()
+    def align(self, modules: Iterable[nn.Module], target: torch.Tensor, actual: torch.Tensor) -> None:
+        """Adjust parameters to make ``actual`` closer to ``target``."""
+        error = target - actual
+        adjust = torch.einsum("bi,bj->ij", target, error)
+        for module in modules:
+            for p in module.parameters():
+                if not p.requires_grad:
+                    continue
+
+                p.mul_(self.decay)
+
+                rows = min(p.shape[0], adjust.shape[0])
+                cols = min(p.shape[1], adjust.shape[1])
+                p[:rows, :cols].add_(self.lr * adjust.to(p.device)[:rows, :cols])
 
 
 if __name__ == "__main__":

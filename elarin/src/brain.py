@@ -132,6 +132,7 @@ def main() -> None:
             )
             thalamus.submit("intero", out_emb)
             trainer.step([dmn.fusion], context)
+            trainer.align([dmn.fusion, motor.area.model.transformer], context, out_emb)
 
             hippocampus.decay()
 
