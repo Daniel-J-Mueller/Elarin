@@ -12,6 +12,7 @@ from transformers import WhisperProcessor, WhisperForConditionalGeneration
 from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
 from .language_areas.wernickes_area import WernickesArea
+from .language_areas.augmenter import LanguageAugmenter
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
@@ -55,6 +56,10 @@ def main() -> None:
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
+    augmenter = LanguageAugmenter(
+        device=devices["language_areas"],
+        persist_path=f"{persist_dir}/augmenter.pt",
+    )
     motor = MotorCortex(
         models["gpt2"],
         wernicke,
@@ -128,6 +133,7 @@ def main() -> None:
                     wernicke.model.config.n_embd,
                     device=wernicke.device,
                 )
+            text_emb = augmenter(text_emb)
             thalamus.submit("audio", text_emb)
 
             vision = thalamus.relay("vision")
@@ -163,7 +169,8 @@ def main() -> None:
                         thalamus.submit(modality, torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0))
 
             out_text, out_emb = motor.act(context)
-            motor.learn_from_feedback(vision_feat, text_emb, out_emb, trainer)
+            out_aug = augmenter(out_emb)
+            motor.learn_from_feedback(vision_feat, text_emb, out_aug, trainer)
 
             hippocampus.add_episode(
                 {
@@ -171,19 +178,19 @@ def main() -> None:
                     "audio": audio.squeeze(0).cpu().numpy(),
                     "intero": intero.squeeze(0).cpu().numpy(),
                     "context": context.squeeze(0).cpu().numpy(),
-                    "motor": out_emb.squeeze(0).cpu().numpy(),
+                    "motor": out_aug.squeeze(0).cpu().numpy(),
                 }
             )
-            thalamus.submit("intero", out_emb)
-            trainer.step([dmn.fusion], context)
+            thalamus.submit("intero", out_aug)
+            trainer.step([dmn.fusion, augmenter], context)
             # Align DMN output with the embedding of the generated token so
             # future contexts better predict the next word. ``Trainer.align``
             # updates parameters to make ``actual`` closer to ``target``.  The
             # token embedding (``out_emb``) therefore acts as the desired
             # target while the DMN context serves as the current prediction.
             trainer.align(
-                [dmn.fusion, motor.area.model.transformer],
-                out_emb,
+                [dmn.fusion, motor.area.model.transformer, augmenter],
+                out_aug,
                 context,
             )
 
@@ -193,10 +200,11 @@ def main() -> None:
             taught = viewer.poll_text_input()
             if taught:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
+                teach_emb = augmenter(teach_emb)
                 hippocampus.add_episode({"motor": teach_emb.squeeze(0).cpu().numpy()})
                 thalamus.submit("intero", teach_emb)
                 trainer.step(
-                    [dmn.fusion, motor.area.model.transformer],
+                    [dmn.fusion, motor.area.model.transformer, augmenter],
                     teach_emb,
                     lr_scale=2.0,
                 )
@@ -208,6 +216,7 @@ def main() -> None:
         viewer.close()
         hippocampus.save()
         motor.save()
+        augmenter.save()
 
 
 if __name__ == "__main__":

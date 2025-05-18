@@ -19,7 +19,7 @@ def wipe(persist_dir: str | Path | None = None) -> None:
         return
 
     removed = False
-    for filename in ("hippocampus.npy", "motor.pt"):
+    for filename in ("hippocampus.npy", "motor.pt", "augmenter.pt"):
         target = path / filename
         if target.exists():
             target.unlink()
