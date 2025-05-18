@@ -13,6 +13,7 @@ class Thalamus:
             "vision": Queue(maxsize=1),
             "audio": Queue(maxsize=1),
             "intero": Queue(maxsize=1),
+            "motor": Queue(maxsize=1),
         }
         self.arousal: float = 1.0  # 0.0 = asleep, 1.0 = fully alert
 
