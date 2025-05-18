@@ -136,6 +136,12 @@ def main() -> None:
             hippocampus.decay()
 
             viewer.update(frame_rgb, out_text, audio_level)
+            taught = viewer.poll_text_input()
+            if taught:
+                teach_emb = wernicke.encode([taught]).mean(dim=1)
+                hippocampus.add_episode({"motor": teach_emb.squeeze(0).cpu().numpy()})
+                thalamus.submit("intero", teach_emb)
+                trainer.step([dmn.fusion, motor.area.model.transformer], teach_emb)
             time.sleep(0.05)
     except KeyboardInterrupt:
         logger.info("demo interrupted")
