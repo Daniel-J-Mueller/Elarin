@@ -20,7 +20,12 @@ class Trainer:
         self._prev_activation = None
 
     @torch.no_grad()
-    def step(self, modules: Iterable[nn.Module], activations: torch.Tensor) -> None:
+    def step(
+        self,
+        modules: Iterable[nn.Module],
+        activations: torch.Tensor,
+        lr_scale: float = 1.0,
+    ) -> None:
         """Apply a trivial Hebbian update to all adapter weights.
 
         Parameters
@@ -29,6 +34,9 @@ class Trainer:
             Collection of modules containing parameters to update.
         activations:
             Activation tensor used to compute outer-product updates.
+        lr_scale:
+            Multiplier applied to ``self.lr`` for this step. Allows temporary
+            learning-rate boosts when receiving corrective feedback.
         """
         outer = torch.einsum("bi,bj->ij", activations, activations)
         act = activations.squeeze(0)
@@ -46,7 +54,7 @@ class Trainer:
         else:
             self._prev_activation = act.cpu().clone()
 
-        scaled_lr = self.lr * novelty
+        scaled_lr = self.lr * lr_scale * novelty
         for module in modules:
             for p in module.parameters():
                 if not p.requires_grad:
@@ -65,13 +73,22 @@ class Trainer:
                     )
 
     @torch.no_grad()
-    def align(self, modules: Iterable[nn.Module], target: torch.Tensor, actual: torch.Tensor) -> None:
+    def align(
+        self,
+        modules: Iterable[nn.Module],
+        target: torch.Tensor,
+        actual: torch.Tensor,
+        lr_scale: float = 1.0,
+    ) -> None:
         """Adjust parameters to make ``actual`` closer to ``target``.
 
         ``target`` and ``actual`` may originate from different devices
         (e.g. DMN vs. motor cortex).  ``actual`` is therefore moved to the
         device of ``target`` before computing the error so that operations
         succeed regardless of their source locations.
+
+        lr_scale:
+            Multiplier applied to ``self.lr`` for this alignment update.
         """
 
         if target.device != actual.device:
@@ -89,11 +106,13 @@ class Trainer:
                 if p.ndim == 1:
                     length = min(p.shape[0], error.shape[1])
                     grad = error.mean(dim=0).to(p.device)[:length]
-                    p[:length].add_(self.lr * grad)
+                    p[:length].add_(self.lr * lr_scale * grad)
                 else:
                     rows = min(p.shape[0], adjust.shape[0])
                     cols = min(p.shape[1], adjust.shape[1])
-                    p[:rows, :cols].add_(self.lr * adjust.to(p.device)[:rows, :cols])
+                    p[:rows, :cols].add_(
+                        self.lr * lr_scale * adjust.to(p.device)[:rows, :cols]
+                    )
 
 
 if __name__ == "__main__":

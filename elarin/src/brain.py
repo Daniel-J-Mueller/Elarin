@@ -123,6 +123,7 @@ def main() -> None:
                         thalamus.submit(modality, torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0))
 
             out_text, out_emb = motor.act(context)
+            motor.learn_from_feedback(vision_feat, text_emb, out_emb, trainer)
 
             hippocampus.add_episode(
                 {
@@ -135,7 +136,11 @@ def main() -> None:
             )
             thalamus.submit("intero", out_emb)
             trainer.step([dmn.fusion], context)
-            trainer.align([dmn.fusion, motor.area.model.transformer], context, out_emb)
+            trainer.align(
+                [dmn.fusion, motor.area.model.transformer],
+                context,
+                out_emb,
+            )
 
             hippocampus.decay()
 
@@ -145,7 +150,11 @@ def main() -> None:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 hippocampus.add_episode({"motor": teach_emb.squeeze(0).cpu().numpy()})
                 thalamus.submit("intero", teach_emb)
-                trainer.step([dmn.fusion, motor.area.model.transformer], teach_emb)
+                trainer.step(
+                    [dmn.fusion, motor.area.model.transformer],
+                    teach_emb,
+                    lr_scale=2.0,
+                )
             time.sleep(0.05)
     except KeyboardInterrupt:
         logger.info("demo interrupted")
