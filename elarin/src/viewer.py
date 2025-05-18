@@ -3,6 +3,7 @@
 from PIL import Image, ImageDraw
 from typing import Union
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def render(frame: Union[Image.Image, np.ndarray], text: str = "") -> Image.Image:
@@ -16,3 +17,12 @@ def render(frame: Union[Image.Image, np.ndarray], text: str = "") -> Image.Image
     draw.rectangle([(0, frame.height), (frame.width, frame.height + bar_height)], fill=(0, 0, 0))
     draw.text((5, frame.height + 5), text, fill=(255, 255, 255))
     return result
+
+
+def show(image: Image.Image) -> None:
+    """Display an image in a small matplotlib window."""
+    plt.figure("Elarin Viewer")
+    plt.imshow(image)
+    plt.axis("off")
+    plt.show(block=False)
+
