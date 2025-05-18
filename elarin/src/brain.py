@@ -35,6 +35,8 @@ def main() -> None:
     wernicke = WernickesArea(models["gpt2"], device=devices["language_areas"])
 
     dmn = DefaultModeNetwork(intero_dim=768, hidden_dim=2048, output_dim=768, num_layers=4).to(devices["dmn"])
+    # Weight sensory inputs slightly higher than internal interoceptive signals
+    dmn.set_modality_weights(vision=1.2, audio=1.2, intero=1.0)
     hippocampus = Hippocampus(
         dims={
             "vision": 128,
@@ -113,7 +115,8 @@ def main() -> None:
             if recalled:
                 if "context" in recalled:
                     recall_ctx = torch.tensor(recalled["context"], device=dmn_device).unsqueeze(0)
-                    context = context + recall_ctx
+                    # Prioritize new sensory context over recalled thoughts
+                    context = 0.7 * context + 0.3 * recall_ctx
                 # Push other modalities back through the thalamus for replay
                 for modality in ("vision", "audio", "intero", "motor"):
                     if modality in recalled:
