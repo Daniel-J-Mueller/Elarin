@@ -75,3 +75,10 @@ outlined in `AGENTS.md`.
 - Provide docker configuration for easier deployment.
 
 Elarin is a work in progress; contributions and experimentation are welcome.
+
+### Quick Demo
+
+Running ``python -m elarin.src.brain`` will execute a minimal integration
+test that loads the decapitated models, fuses a dummy image with text and
+prints the motor cortex output. A window displays the image with the generated
+text in a bar at the bottom.

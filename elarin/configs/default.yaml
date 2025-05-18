@@ -1,0 +1,20 @@
+# Default configuration for Elarin
+
+# GPU allocation for each major module
+devices:
+  retina: cuda:0
+  cochlea: cuda:0
+  occipital_lobe: cuda:1
+  auditory_cortex: cuda:1
+  dmn: cuda:2
+  hippocampus: cuda:2
+  cortex_modules: cuda:2
+  motor_cortex: cuda:3
+  language_areas: cuda:3
+  trainer: cuda:3
+
+# Paths to offline models relative to repository root
+models:
+  clip: models/clip-vit-b32
+  whisper: models/whisper-small
+  gpt2: models/gpt2

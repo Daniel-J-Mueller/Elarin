@@ -10,10 +10,12 @@ class WernickesArea:
     memory after encoding.
     """
 
-    def __init__(self, model_dir: str):
+    def __init__(self, model_dir: str, device: str = "cpu"):
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_dir)
         self.model = GPT2Model.from_pretrained(model_dir)
+        self.model.to(device)
         self.model.eval()
+        self.device = device
 
     @torch.no_grad()
     def encode(self, texts: Iterable[str]) -> torch.Tensor:
@@ -21,7 +23,7 @@ class WernickesArea:
 
         Tokens are immediately discarded after computing embeddings.
         """
-        tokens = self.tokenizer(list(texts), return_tensors="pt", padding=True)
+        tokens = self.tokenizer(list(texts), return_tensors="pt", padding=True).to(self.device)
         outputs = self.model(**tokens)
         hidden = outputs.last_hidden_state
         del tokens  # ensure tokens don't persist

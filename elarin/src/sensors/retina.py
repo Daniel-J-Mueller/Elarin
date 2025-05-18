@@ -11,15 +11,17 @@ class Retina:
     discarded after encoding.
     """
 
-    def __init__(self, model_dir: str):
+    def __init__(self, model_dir: str, device: str = "cpu"):
         self.processor = CLIPProcessor.from_pretrained(model_dir)
         self.model = CLIPModel.from_pretrained(model_dir)
+        self.model.to(device)
         self.model.eval()
+        self.device = device
 
     @torch.no_grad()
     def encode(self, images: Iterable[Image]) -> torch.Tensor:
         """Return image embeddings for the provided ``images``."""
-        inputs = self.processor(images=list(images), return_tensors="pt")
+        inputs = self.processor(images=list(images), return_tensors="pt").to(self.device)
         features = self.model.get_image_features(**inputs)
         return features
 

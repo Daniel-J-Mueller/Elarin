@@ -2,3 +2,5 @@ torch
 transformers
 huggingface-hub
 torchvision
+numpy
+pillow
