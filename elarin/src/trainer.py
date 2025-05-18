@@ -36,14 +36,15 @@ class Trainer:
         # Compute novelty based on similarity to recent activation
         novelty = 1.0
         if self._prev_activation is not None:
-            sim = torch.nn.functional.cosine_similarity(act, self._prev_activation, dim=0)
+            prev = self._prev_activation.to(act.device)
+            sim = torch.nn.functional.cosine_similarity(act, prev, dim=0)
             novelty = float(1.0 - sim.clamp(min=0.0).item())
 
             # Update running average of activation
             self._prev_activation.mul_(self.novelty_alpha)
-            self._prev_activation.add_((1.0 - self.novelty_alpha) * act)
+            self._prev_activation.add_((1.0 - self.novelty_alpha) * act.cpu())
         else:
-            self._prev_activation = act.clone()
+            self._prev_activation = act.cpu().clone()
 
         scaled_lr = self.lr * novelty
         for module in modules:
@@ -55,11 +56,11 @@ class Trainer:
 
                 if p.ndim == 1:
                     length = min(p.shape[0], act.shape[0])
-                    p[:length].add_(scaled_lr * act[:length])
+                    p[:length].add_(scaled_lr * act.to(p.device)[:length])
                 else:
                     rows = min(p.shape[0], outer.shape[0])
                     cols = min(p.shape[1], outer.shape[1])
-                    p[:rows, :cols].add_(scaled_lr * outer[:rows, :cols])
+                    p[:rows, :cols].add_(scaled_lr * outer.to(p.device)[:rows, :cols])
 
 
 if __name__ == "__main__":
