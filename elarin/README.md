@@ -49,9 +49,10 @@ The script downloads the following models sequentially:
 
 To keep the system on a purely semantic level, models are "decapitated"
 so that only continuous embeddings are passed between brain regions. The
-utility class `DecapitatedGPT2` in `src/decapitated_gpt2.py` exposes the
-hidden state encoder of GPT-2 without the language modeling head. Text is
-tokenized only transiently during encoding and is immediately discarded.
+`WernickesArea` class in `src/language_areas/wernickes_area.py` wraps the
+front half of GPT-2 and exposes hidden-state embeddings without the
+language modeling head. Text is tokenized only transiently during
+encoding and is immediately discarded.
 
 ## Development Notes
 
