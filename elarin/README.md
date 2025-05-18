@@ -39,11 +39,19 @@ elarin/
    python elarin/models/model_initialization_scripts/download_models.py
    ```
 
-   The script downloads the following models sequentially:
+The script downloads the following models sequentially:
 
    - `openai/clip-vit-base-patch32`
-   - `openai/whisper-small`
-   - `gpt2`
+- `openai/whisper-small`
+- `gpt2`
+
+### Symbolic Embedding Pipeline
+
+To keep the system on a purely semantic level, models are "decapitated"
+so that only continuous embeddings are passed between brain regions. The
+utility class `DecapitatedGPT2` in `src/decapitated_gpt2.py` exposes the
+hidden state encoder of GPT-2 without the language modeling head. Text is
+tokenized only transiently during encoding and is immediately discarded.
 
 ## Development Notes
 
