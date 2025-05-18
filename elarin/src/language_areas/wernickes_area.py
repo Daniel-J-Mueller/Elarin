@@ -29,7 +29,13 @@ class WernickesArea:
 
         Tokens are immediately discarded after computing embeddings.
         """
-        tokens = self.tokenizer(list(texts), return_tensors="pt", padding=True).to(self.device)
+        tokens = self.tokenizer(
+            list(texts),
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.model.config.n_positions,
+        ).to(self.device)
         outputs = self.model(**tokens)
         hidden = outputs.last_hidden_state
         del tokens  # ensure tokens don't persist

@@ -13,6 +13,7 @@ from .occipital_lobe import OccipitalLobe
 from .language_areas.wernickes_area import WernickesArea
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
+from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .hippocampus import Hippocampus
 from .thalamus import Thalamus
 from .trainer import Trainer
@@ -46,7 +47,13 @@ def main() -> None:
             "motor": 768,
         }
     )
-    motor = MotorCortex(models["gpt2"], wernicke, device=devices["motor_cortex"])
+    axis = HypothalamusPituitaryAxis()
+    motor = MotorCortex(
+        models["gpt2"],
+        wernicke,
+        device=devices["motor_cortex"],
+        axis=axis,
+    )
 
     thalamus = Thalamus()
     trainer = Trainer()
