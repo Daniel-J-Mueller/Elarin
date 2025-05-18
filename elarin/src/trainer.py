@@ -25,11 +25,21 @@ class Trainer:
             Activation tensor used to compute outer-product updates.
         """
         outer = torch.einsum("bi,bj->ij", activations, activations)
+        act = activations.squeeze(0)
         for module in modules:
             for p in module.parameters():
-                if p.requires_grad:
-                    p.mul_(self.decay)
-                    p.add_(self.lr * outer[: p.shape[0], : p.shape[1]])
+                if not p.requires_grad:
+                    continue
+
+                p.mul_(self.decay)
+
+                if p.ndim == 1:
+                    length = min(p.shape[0], act.shape[0])
+                    p[:length].add_(self.lr * act[:length])
+                else:
+                    rows = min(p.shape[0], outer.shape[0])
+                    cols = min(p.shape[1], outer.shape[1])
+                    p[:rows, :cols].add_(self.lr * outer[:rows, :cols])
 
 
 if __name__ == "__main__":
