@@ -6,6 +6,7 @@ import time
 import cv2
 import sounddevice as sd
 import numpy as np
+from pathlib import Path
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
 from .sensors.retina import Retina
@@ -27,7 +28,11 @@ def main() -> None:
     cfg = load_config("configs/default.yaml")
     devices = cfg["devices"]
     models = cfg["models"]
-    persist_dir = cfg.get("persistent_dir", "persistent")
+    persist_dir = Path(cfg.get("persistent_dir", "persistent"))
+
+    if not persist_dir.is_absolute():
+        from .utils.config import BASE_DIR
+        persist_dir = BASE_DIR / persist_dir
 
     logger = get_logger("brain")
 
