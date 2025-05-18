@@ -17,6 +17,7 @@ class DefaultModeNetwork(nn.Module):
         hidden_dim: int = 2048,
         output_dim: int = 768,
         num_layers: int = 4,
+        modality_weights: tuple[float, float, float] | None = None,
     ) -> None:
         """Create a larger fusion network.
 
@@ -29,6 +30,9 @@ class DefaultModeNetwork(nn.Module):
         super().__init__()
         fusion_in = vision_dim + audio_dim + intero_dim
         self.fusion = nn.Linear(fusion_in, hidden_dim)
+        self.modality_scale = nn.Parameter(
+            torch.tensor(modality_weights or (1.0, 1.0, 1.0), dtype=torch.float32)
+        )
 
         layers = []
         for _ in range(num_layers - 1):
@@ -36,9 +40,18 @@ class DefaultModeNetwork(nn.Module):
         layers.append(nn.Linear(hidden_dim, output_dim))
         self.router = nn.Sequential(*layers)
 
+    def set_modality_weights(self, vision: float, audio: float, intero: float) -> None:
+        """Update modality weighting applied during fusion."""
+        with torch.no_grad():
+            self.modality_scale.copy_(torch.tensor([vision, audio, intero], device=self.modality_scale.device))
+
     @torch.no_grad()
     def forward(self, vision: torch.Tensor, audio: torch.Tensor, intero: torch.Tensor) -> torch.Tensor:
         """Return fused context embedding."""
-        combined = torch.cat([vision, audio, intero], dim=-1)
+        scale = torch.relu(self.modality_scale)
+        weighted_vision = vision * scale[0]
+        weighted_audio = audio * scale[1]
+        weighted_intero = intero * scale[2]
+        combined = torch.cat([weighted_vision, weighted_audio, weighted_intero], dim=-1)
         hidden = torch.relu(self.fusion(combined))
         return self.router(hidden)
