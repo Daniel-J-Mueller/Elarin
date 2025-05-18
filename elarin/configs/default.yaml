@@ -21,3 +21,13 @@ models:
 
 # Directory for saving learned state
 persistent_dir: persistent
+
+settings:
+  # Seconds to wait between live loop iterations
+  loop_interval: 0.02
+  # Audio recording window in seconds
+  audio_duration: 0.25
+  # Set true to disable video capture and processing
+  debug_no_video: false
+  # Capacity of episodic memory buffer
+  hippocampus_capacity: 10000
