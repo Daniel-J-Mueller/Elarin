@@ -15,6 +15,10 @@ class Trainer:
         self.novelty_alpha = novelty_alpha
         self._prev_activation: torch.Tensor | None = None
 
+    def reset(self) -> None:
+        """Clear any stored activation history."""
+        self._prev_activation = None
+
     @torch.no_grad()
     def step(self, modules: Iterable[nn.Module], activations: torch.Tensor) -> None:
         """Apply a trivial Hebbian update to all adapter weights.
