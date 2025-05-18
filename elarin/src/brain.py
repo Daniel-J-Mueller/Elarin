@@ -13,6 +13,7 @@ from .occipital_lobe import OccipitalLobe
 from .language_areas.wernickes_area import WernickesArea
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
+from .hippocampus import Hippocampus
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .utils.config import load_config
@@ -33,8 +34,9 @@ def main() -> None:
 
     wernicke = WernickesArea(models["gpt2"], device=devices["language_areas"])
 
-    dmn = DefaultModeNetwork().to(devices["dmn"])
-    motor = MotorCortex(models["gpt2"], device=devices["motor_cortex"])
+    dmn = DefaultModeNetwork(intero_dim=768).to(devices["dmn"])
+    hippocampus = Hippocampus(dim=768)
+    motor = MotorCortex(models["gpt2"], wernicke, device=devices["motor_cortex"])
 
     thalamus = Thalamus()
     trainer = Trainer()
@@ -89,10 +91,22 @@ def main() -> None:
             else:
                 audio = audio.to(dmn_device)
 
-            intero = torch.zeros(1, 64, device=dmn_device)
+            intero = thalamus.relay("intero")
+            if intero is None:
+                intero = torch.zeros(1, 768, device=dmn_device)
+            else:
+                intero = intero.to(dmn_device)
 
             context = dmn(vision, audio, intero)
-            out_text = motor.act(context)
+            recalled = hippocampus.query(context.squeeze(0).cpu().numpy(), k=5)
+            if recalled:
+                mem = torch.tensor(np.mean(recalled, axis=0), device=dmn_device).unsqueeze(0)
+                context = context + mem
+
+            out_text, out_emb = motor.act(context)
+            hippocampus.add(context.squeeze(0).cpu().numpy())
+            hippocampus.add(out_emb.squeeze(0).cpu().numpy())
+            thalamus.submit("intero", out_emb)
             trainer.step([dmn.fusion], context)
 
             viewer.update(frame_rgb, out_text, audio_level)
