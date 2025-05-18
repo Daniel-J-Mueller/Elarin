@@ -29,6 +29,9 @@ This file is the single source of truth for Elarin’s experiential architecture
 │   │   ├── context_cortex.py      # temporal context encoder
 │   │   └── salience_cortex.py     # novelty / importance detector
 │   │
+│   ├── language_areas/
+│   │   ├── wernickes_area.py      # GPT-2 encoder (semantic)
+│   │   └── brocas_area.py         # GPT-2 decoder (text motor)
 │   ├── motor_cortex.py            # split-LLM half₂ → token generation
 │   ├── trainer.py                 # live LoRA & Hebbian adapter updates
 │   └── utils/
@@ -56,6 +59,7 @@ This file is the single source of truth for Elarin’s experiential architecture
     ├── run_ras.sh
     ├── run_hypothalamus.sh
     ├── run_cortex_modules.sh
+    ├── run_brocas_area.sh
     ├── run_motor_cortex.sh
     └── run_trainer.sh
 
@@ -121,12 +125,18 @@ This file is the single source of truth for Elarin’s experiential architecture
   - State machine triggered by salience and queue pressures.  
   - Modulates learning rates, sampling temperature, down-regulation rates.
 
-### 3.8 Motor Cortex (motor_cortex.py)  
-- **Role**: text “motor output.”  
-- **Mechanism**: uses the back half of GPT-2 (6 layers) with LoRA adapters.  
-- **Loopback**: each generated token is re-embedded and fed back as interoceptive/news sample.
+### 3.8 Language Areas
+- **wernickes_area.py**
+  - Front half of GPT-2 producing semantic embeddings.
+- **brocas_area.py**
+  - Decodes embeddings back into text tokens.
 
-### 3.9 Trainer (trainer.py)  
+### 3.9 Motor Cortex (motor_cortex.py)
+ - **Role**: text “motor output.”
+ - **Mechanism**: uses the back half of GPT-2 (6 layers) with LoRA adapters.
+ - **Loopback**: each generated token is re-embedded and fed back as interoceptive/news sample.
+
+### 3.10 Trainer (trainer.py)
 - **Responsibilities**:  
   - **Hebbian updates** on adapter weights: reinforce high-activation chains immediately.  
   - **Down-regulation**: apply tiny decay to all adapters when unused.  

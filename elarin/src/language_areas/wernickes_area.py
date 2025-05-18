@@ -2,11 +2,12 @@ import torch
 from transformers import GPT2Tokenizer, GPT2Model
 from typing import Iterable
 
-class DecapitatedGPT2:
-    """GPT-2 encoder that exposes only hidden states.
+class WernickesArea:
+    """Front half of GPT-2 used for semantic encoding.
 
-    The LM head is discarded so no token logits are produced.
-    Text is tokenized only transiently and never stored.
+    The language modeling head is discarded so only hidden state
+    embeddings are produced. Tokens are transient and never kept in
+    memory after encoding.
     """
 
     def __init__(self, model_dir: str):
