@@ -42,8 +42,22 @@ elarin/
 The script downloads the following models sequentially:
 
    - `openai/clip-vit-base-patch32`
-- `openai/whisper-small`
-- `gpt2`
+   - `openai/whisper-small`
+   - `gpt2`
+
+3. **Run the Demo**
+
+   Execute the minimal integration test from the repository root (the
+   directory containing the ``elarin`` folder). This
+   command launches the brain, renders a blank frame in a small window and
+   prints the motor cortex output:
+
+   ```bash
+   python -m elarin.src.brain
+   ```
+
+   Alternatively, you can run `./scripts/run_brain.sh` which performs the
+   same action with the proper `PYTHONPATH` configured.
 
 ### Symbolic Embedding Pipeline
 
