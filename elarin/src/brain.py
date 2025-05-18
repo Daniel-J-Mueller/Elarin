@@ -36,7 +36,15 @@ def main() -> None:
     wernicke = WernickesArea(models["gpt2"], device=devices["language_areas"])
 
     dmn = DefaultModeNetwork(intero_dim=768).to(devices["dmn"])
-    hippocampus = Hippocampus(dim=768)
+    hippocampus = Hippocampus(
+        dims={
+            "vision": 128,
+            "audio": 768,
+            "intero": 768,
+            "context": 768,
+            "motor": 768,
+        }
+    )
     motor = MotorCortex(models["gpt2"], wernicke, device=devices["motor_cortex"])
 
     thalamus = Thalamus()
@@ -102,10 +110,14 @@ def main() -> None:
                 intero = intero.to(dmn_device)
 
             context = dmn(vision, audio, intero)
-            recalled = hippocampus.query(context.squeeze(0).cpu().numpy(), k=5)
+            recalled = hippocampus.query(
+                "context", context.squeeze(0).cpu().numpy(), k=5
+            )
             if recalled:
-                mem = torch.tensor(np.mean(recalled, axis=0), device=dmn_device).unsqueeze(0)
-                context = context + mem
+                addition = []
+                for key, val in recalled.items():
+                    addition.append(torch.tensor(val, device=dmn_device).unsqueeze(0))
+                context = context + sum(addition)
 
             out_text, out_emb = motor.act(context)
             # Track repetition of motor output
@@ -118,16 +130,20 @@ def main() -> None:
             prev_emb = out_emb.squeeze(0)
 
             if repeat_count >= 10:
-                logger.warning("reorienting due to repetitive output")
-                hippocampus.decay(0.5)
-                hippocampus.clear()
-                trainer.reset()
-                thalamus.submit("intero", torch.zeros_like(out_emb))
+                logger.warning("output repetition detected")
+                noise = torch.randn_like(out_emb) * 0.01
+                thalamus.submit("intero", out_emb + noise)
                 repeat_count = 0
-                prev_emb = None
 
-            hippocampus.add(context.squeeze(0).cpu().numpy())
-            hippocampus.add(out_emb.squeeze(0).cpu().numpy())
+            hippocampus.add_episode(
+                {
+                    "vision": vision.squeeze(0).cpu().numpy(),
+                    "audio": audio.squeeze(0).cpu().numpy(),
+                    "intero": intero.squeeze(0).cpu().numpy(),
+                    "context": context.squeeze(0).cpu().numpy(),
+                    "motor": out_emb.squeeze(0).cpu().numpy(),
+                }
+            )
             thalamus.submit("intero", out_emb)
             trainer.step([dmn.fusion], context)
 
