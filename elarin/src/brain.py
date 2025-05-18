@@ -68,7 +68,8 @@ def main() -> None:
             audio_samples = sd.rec(int(1.0 * 16000), samplerate=16000, channels=1)
             sd.wait()
             audio_np = audio_samples.squeeze().astype(np.float32)
-            audio_level = float(np.abs(audio_np).mean()) * 5.0
+            # Compute a simple RMS volume estimate and boost the gain for display
+            audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
             inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
             input_features = inputs.input_features.to(asr_device)
             predicted_ids = asr_model.generate(input_features)

@@ -19,6 +19,9 @@ class Viewer:
 
     def update(self, frame: np.ndarray, text: str = "", audio_level: float = 0.0) -> None:
         surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
+        # Scale the surface so the entire image fits inside the viewer window
+        if surface.get_width() != self.width or surface.get_height() != self.height:
+            surface = pygame.transform.smoothscale(surface, (self.width, self.height))
         self.screen.blit(surface, (0, 0))
         pygame.draw.rect(
             self.screen, (0, 0, 0), (0, self.height, self.width, self.bar_height)
