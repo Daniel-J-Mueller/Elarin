@@ -48,9 +48,10 @@ The script downloads the following models sequentially:
 3. **Run the Demo**
 
    Execute the minimal integration test from the repository root (the
-   directory containing the ``elarin`` folder). This
-   command launches the brain and brings up the viewer window while also
-   printing the motor cortex output:
+   directory containing the ``elarin`` folder). This command launches
+   the brain and starts a small viewer window while also printing the
+   motor cortex output.  The window updates continuously until you
+   interrupt the program with ``Ctrl+C``:
 
    ```bash
    python -m elarin.src.brain
@@ -92,8 +93,8 @@ Elarin is a work in progress; contributions and experimentation are welcome.
 
 ### Quick Demo
 
-Running ``python -m elarin.src.brain`` will execute a minimal integration
+Running ``python -m elarin.src.brain`` executes a minimal integration
 test that loads the decapitated models, fuses a dummy image with text and
 prints the motor cortex output. A viewer window powered by ``matplotlib``
-will appear showing the frame with the generated text in a bar at the bottom.
-Close the window to end the demo.
+updates in real time to show the generated text. Press ``Ctrl+C`` to end the
+demo.
