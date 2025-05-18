@@ -149,10 +149,15 @@ def main() -> None:
             )
             thalamus.submit("intero", out_emb)
             trainer.step([dmn.fusion], context)
+            # Align DMN output with the embedding of the generated token so
+            # future contexts better predict the next word. ``Trainer.align``
+            # updates parameters to make ``actual`` closer to ``target``.  The
+            # token embedding (``out_emb``) therefore acts as the desired
+            # target while the DMN context serves as the current prediction.
             trainer.align(
                 [dmn.fusion, motor.area.model.transformer],
-                context,
                 out_emb,
+                context,
             )
 
             hippocampus.decay()
