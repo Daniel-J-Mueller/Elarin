@@ -40,8 +40,13 @@ def main() -> None:
     text_emb = wernicke.encode(["hello world"]).mean(dim=1)
     thalamus.submit("audio", text_emb)
 
-    vision = thalamus.relay("vision") or torch.zeros(1, 128)
-    audio = thalamus.relay("audio") or torch.zeros(1, text_emb.size(-1))
+    vision = thalamus.relay("vision")
+    if vision is None:
+        vision = torch.zeros(1, 128)
+
+    audio = thalamus.relay("audio")
+    if audio is None:
+        audio = torch.zeros(1, text_emb.size(-1))
     intero = torch.zeros(1, 64)
 
     context = dmn(vision, audio, intero)
