@@ -6,7 +6,6 @@ import time
 import cv2
 import sounddevice as sd
 import numpy as np
-import torch.nn.functional as F
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
 from .sensors.retina import Retina
@@ -53,8 +52,6 @@ def main() -> None:
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
 
-    prev_emb: torch.Tensor | None = None
-    repeat_count = 0
 
     cam = Camera()
     viewer = Viewer(224, 224)
@@ -123,20 +120,6 @@ def main() -> None:
                         thalamus.submit(modality, torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0))
 
             out_text, out_emb = motor.act(context)
-            # Track repetition of motor output
-            if prev_emb is not None:
-                sim = F.cosine_similarity(out_emb.squeeze(0), prev_emb, dim=0)
-                if sim > 0.98:
-                    repeat_count += 1
-                else:
-                    repeat_count = 0
-            prev_emb = out_emb.squeeze(0)
-
-            if repeat_count >= 10:
-                logger.warning("output repetition detected")
-                noise = torch.randn_like(out_emb) * 0.01
-                thalamus.submit("intero", out_emb + noise)
-                repeat_count = 0
 
             hippocampus.add_episode(
                 {
