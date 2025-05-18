@@ -6,7 +6,7 @@ import time
 import cv2
 import sounddevice as sd
 import numpy as np
-import whisper
+from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
 from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
@@ -42,7 +42,11 @@ def main() -> None:
     dmn_device = devices["dmn"]
 
     cam = cv2.VideoCapture(0)
-    asr = whisper.load_model(models["whisper"])
+    asr_processor = WhisperProcessor.from_pretrained(models["whisper"])
+    asr_model = WhisperForConditionalGeneration.from_pretrained(models["whisper"])
+    asr_device = devices.get("cochlea", "cpu")
+    asr_model.to(asr_device)
+    asr_model.eval()
 
     try:
         while True:
@@ -61,8 +65,10 @@ def main() -> None:
             audio_samples = sd.rec(int(1.0 * 16000), samplerate=16000, channels=1)
             sd.wait()
             audio_np = audio_samples.squeeze().astype(np.float32)
-            result = asr.transcribe(audio_np, language="en", fp16=False)
-            spoken = result.get("text", "")
+            inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
+            input_features = inputs.input_features.to(asr_device)
+            predicted_ids = asr_model.generate(input_features)
+            spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
             text_emb = wernicke.encode([spoken]).mean(dim=1)
             thalamus.submit("audio", text_emb)
 
