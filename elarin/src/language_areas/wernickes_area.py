@@ -29,12 +29,15 @@ class WernickesArea:
 
         Tokens are immediately discarded after computing embeddings.
         """
+        # ``max_length`` previously forced sequences to pad to 1024 tokens which
+        # meant short inputs ended up dominated by ``pad_token`` embeddings.
+        # That drowned out the actual content when selecting the last token.
+        # Remove the explicit length so padding is only applied up to the
+        # longest input in the batch.
         tokens = self.tokenizer(
             list(texts),
             return_tensors="pt",
             padding=True,
-            truncation=True,
-            max_length=self.model.config.n_positions,
         ).to(self.device)
         outputs = self.model(**tokens)
         hidden = outputs.last_hidden_state
