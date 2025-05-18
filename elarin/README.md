@@ -101,7 +101,7 @@ displays the live camera feed with an audio level meter and text overlay.
 Press ``Ctrl+C`` to end the demo.
 
 All learned memories and adapter weights are automatically written to the
-``persistent/`` directory so progress can be resumed on the next launch.
-Removing that directory resets the brain back to its initial state. You can
-also run ``python -m elarin.src.utils.memory_wipe`` to delete any saved
-snapshots in the ``persistent/`` folder.
+``elarin/persistent/`` directory so progress can be resumed on the next
+launch. Removing that directory resets the brain back to its initial
+state. You can also run ``python -m elarin.src.utils.memory_wipe`` to
+delete any saved snapshots in the ``elarin/persistent/`` folder.
