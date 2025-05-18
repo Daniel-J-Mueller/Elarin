@@ -12,8 +12,7 @@ class MotorCortex:
 
     def __init__(self, model_dir: str, device: str = "cpu"):
         self.logger = get_logger("motor_cortex")
-        self.area = BrocasArea(model_dir)
-        self.area.model.to(device)
+        self.area = BrocasArea(model_dir, device=device)
         self.device = device
 
     @torch.no_grad()

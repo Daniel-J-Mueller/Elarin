@@ -21,12 +21,10 @@ def main() -> None:
 
     logger = get_logger("brain")
 
-    retina = Retina(models["clip"])
-    retina.model.to(devices["retina"])
-    occipital = OccipitalLobe().to(devices["occipital_lobe"])
+    retina = Retina(models["clip"], device=devices["retina"])
+    occipital = OccipitalLobe(device=devices["occipital_lobe"])
 
-    wernicke = WernickesArea(models["gpt2"])
-    wernicke.model.to(devices["language_areas"])
+    wernicke = WernickesArea(models["gpt2"], device=devices["language_areas"])
 
     dmn = DefaultModeNetwork().to(devices["dmn"])
     motor = MotorCortex(models["gpt2"], device=devices["motor_cortex"])
