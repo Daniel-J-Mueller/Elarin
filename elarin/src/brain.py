@@ -27,6 +27,7 @@ def main() -> None:
     cfg = load_config("configs/default.yaml")
     devices = cfg["devices"]
     models = cfg["models"]
+    persist_dir = cfg.get("persistent_dir", "persistent")
 
     logger = get_logger("brain")
 
@@ -45,7 +46,8 @@ def main() -> None:
             "intero": 768,
             "context": 768,
             "motor": 768,
-        }
+        },
+        persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
     motor = MotorCortex(
@@ -53,6 +55,7 @@ def main() -> None:
         wernicke,
         device=devices["motor_cortex"],
         axis=axis,
+        persist_path=f"{persist_dir}/motor.pt",
     )
 
     thalamus = Thalamus()
@@ -92,7 +95,11 @@ def main() -> None:
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
             inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
             input_features = inputs.input_features.to(asr_device)
-            predicted_ids = asr_model.generate(input_features)
+            predicted_ids = asr_model.generate(
+                input_features,
+                attention_mask=inputs.attention_mask.to(asr_device),
+                max_new_tokens=16,
+            )
             spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
             text_emb = wernicke.encode([spoken]).mean(dim=1)
             thalamus.submit("audio", text_emb)
@@ -168,6 +175,8 @@ def main() -> None:
     finally:
         cam.release()
         viewer.close()
+        hippocampus.save()
+        motor.save()
 
 
 if __name__ == "__main__":

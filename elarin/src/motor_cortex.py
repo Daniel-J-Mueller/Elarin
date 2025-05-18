@@ -2,6 +2,7 @@
 
 import torch
 from torch import nn
+from pathlib import Path
 
 from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
@@ -19,6 +20,7 @@ class MotorCortex:
         wernicke: WernickesArea,
         device: str = "cpu",
         axis: HypothalamusPituitaryAxis | None = None,
+        persist_path: str | None = None,
     ) -> None:
         self.logger = get_logger("motor_cortex")
         self.area = BrocasArea(model_dir, device=device)
@@ -26,6 +28,24 @@ class MotorCortex:
         self.axis = axis
         self.device = device
         self.vision_to_text = nn.Linear(128, self.area.model.config.n_embd).to(device)
+        if persist_path and Path(persist_path).exists():
+            state = torch.load(persist_path, map_location=device)
+            self.area.model.load_state_dict(state.get("broca", {}), strict=False)
+            self.vision_to_text.load_state_dict(state.get("vision_to_text", {}), strict=False)
+        self.persist_path = persist_path
+        
+    def save(self, path: str | None = None) -> None:
+        """Save adapter parameters for later reloading."""
+        target = path or self.persist_path
+        if not target:
+            return
+        torch.save(
+            {
+                "broca": self.area.model.state_dict(),
+                "vision_to_text": self.vision_to_text.state_dict(),
+            },
+            target,
+        )
 
     @torch.no_grad()
     def act(self, hidden: torch.Tensor, temperature: float | None = None) -> tuple[str, torch.Tensor]:
