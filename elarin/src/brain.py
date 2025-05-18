@@ -97,7 +97,6 @@ def main() -> None:
             input_features = inputs.input_features.to(asr_device)
             predicted_ids = asr_model.generate(
                 input_features,
-                attention_mask=inputs.attention_mask.to(asr_device),
                 max_new_tokens=16,
             )
             spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
