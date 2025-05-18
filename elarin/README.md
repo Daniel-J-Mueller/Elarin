@@ -54,6 +54,13 @@ front half of GPT-2 and exposes hidden-state embeddings without the
 language modeling head. Text is tokenized only transiently during
 encoding and is immediately discarded.
 
+Similarly, the `Retina` class in `src/sensors/retina.py` uses the vision
+branch of CLIP to convert raw images into 512-dimensional embeddings. No
+classification logits or text tokens are produced, so pixel data is
+discarded after encoding. The resulting vectors can be further processed
+by `OccipitalLobe` (`src/occipital_lobe.py`) which reduces them to
+compact 128-dimensional visual features.
+
 ## Development Notes
 
 Each brain region in `src/` will ultimately run as its own service. The scripts
