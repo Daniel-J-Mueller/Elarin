@@ -17,7 +17,8 @@ from .thalamus import Thalamus
 from .trainer import Trainer
 from .utils.config import load_config
 from .utils.logger import get_logger
-from .viewer import render, show
+from .viewer import Viewer
+from .utils.camera import Camera
 
 
 def main() -> None:
@@ -41,7 +42,8 @@ def main() -> None:
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
 
-    cam = cv2.VideoCapture(0)
+    cam = Camera()
+    viewer = Viewer(224, 224)
     asr_processor = WhisperProcessor.from_pretrained(models["whisper"])
     asr_model = WhisperForConditionalGeneration.from_pretrained(models["whisper"])
     asr_device = devices.get("cochlea", "cpu")
@@ -50,10 +52,11 @@ def main() -> None:
 
     try:
         while True:
-            ret, frame_bgr = cam.read()
-            if not ret:
+            frame_bgr = cam.read()
+            if frame_bgr is None:
                 logger.warning("camera frame not captured")
                 img = Image.new("RGB", (224, 224), color="white")
+                frame_rgb = np.array(img)
             else:
                 frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
                 img = Image.fromarray(frame_rgb).resize((224, 224))
@@ -65,6 +68,7 @@ def main() -> None:
             audio_samples = sd.rec(int(1.0 * 16000), samplerate=16000, channels=1)
             sd.wait()
             audio_np = audio_samples.squeeze().astype(np.float32)
+            audio_level = float(np.abs(audio_np).mean()) * 5.0
             inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
             input_features = inputs.input_features.to(asr_device)
             predicted_ids = asr_model.generate(input_features)
@@ -90,11 +94,13 @@ def main() -> None:
             out_text = motor.act(context)
             trainer.step([dmn.fusion], context)
 
-            frame = render(img, out_text)
-            show(frame)
-            time.sleep(0.1)
+            viewer.update(frame_rgb, out_text, audio_level)
+            time.sleep(0.05)
     except KeyboardInterrupt:
         logger.info("demo interrupted")
+    finally:
+        cam.release()
+        viewer.close()
 
 
 if __name__ == "__main__":

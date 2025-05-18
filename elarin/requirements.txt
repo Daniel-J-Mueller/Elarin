@@ -8,3 +8,4 @@ matplotlib
 opencv-python
 sounddevice
 openai-whisper
+pygame

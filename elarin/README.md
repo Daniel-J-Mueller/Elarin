@@ -49,8 +49,8 @@ The script downloads the following models sequentially:
 
    Execute the minimal integration test from the repository root (the
    directory containing the ``elarin`` folder). This command launches
-   the brain and starts a small viewer window while also printing the
-   motor cortex output.  The window updates continuously until you
+   the brain and starts a small PyGame viewer window while also printing
+   the motor cortex output.  The window updates continuously until you
    interrupt the program with ``Ctrl+C``:
 
    ```bash
@@ -95,6 +95,6 @@ Elarin is a work in progress; contributions and experimentation are welcome.
 
 Running ``python -m elarin.src.brain`` executes a minimal integration
 test that loads the decapitated models, fuses a dummy image with text and
-prints the motor cortex output. A viewer window powered by ``matplotlib``
-updates in real time to show the generated text. Press ``Ctrl+C`` to end the
-demo.
+prints the motor cortex output. A viewer window powered by ``pygame``
+displays the live camera feed with an audio level meter and text overlay.
+Press ``Ctrl+C`` to end the demo.
