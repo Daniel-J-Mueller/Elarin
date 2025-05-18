@@ -1,4 +1,7 @@
+"""Utility for clearing all persistent state."""
+
 from pathlib import Path
+import shutil
 
 try:  # Support running as a script
     from .logger import get_logger
@@ -23,11 +26,17 @@ def wipe(persist_dir: str | Path | None = None) -> None:
             logger.info(f"deleted {target}")
             removed = True
 
-    # remove any additional files except README
-    for extra in path.iterdir():
-        if extra.is_file() and extra.name not in {"README.md"} and extra.name not in ("hippocampus.npy", "motor.pt"):
+    # remove any additional files or directories except README
+    for extra in list(path.iterdir()):
+        if extra.name == "README.md":
+            continue
+        if extra.is_file():
             extra.unlink()
-            logger.info(f"removed extra file {extra}")
+            logger.info(f"removed file {extra}")
+            removed = True
+        elif extra.is_dir():
+            shutil.rmtree(extra)
+            logger.info(f"removed directory {extra}")
             removed = True
 
     if removed:

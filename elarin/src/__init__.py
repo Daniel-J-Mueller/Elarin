@@ -1,5 +1,12 @@
 """Elarin brain modules."""
 
-from .brain import main
+from __future__ import annotations
 
 __all__ = ["main"]
+
+
+def main() -> None:
+    """Entry point for the demo script."""
+    from .brain import main as run
+
+    run()
