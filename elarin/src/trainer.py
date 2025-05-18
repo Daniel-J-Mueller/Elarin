@@ -66,7 +66,17 @@ class Trainer:
 
     @torch.no_grad()
     def align(self, modules: Iterable[nn.Module], target: torch.Tensor, actual: torch.Tensor) -> None:
-        """Adjust parameters to make ``actual`` closer to ``target``."""
+        """Adjust parameters to make ``actual`` closer to ``target``.
+
+        ``target`` and ``actual`` may originate from different devices
+        (e.g. DMN vs. motor cortex).  ``actual`` is therefore moved to the
+        device of ``target`` before computing the error so that operations
+        succeed regardless of their source locations.
+        """
+
+        if target.device != actual.device:
+            actual = actual.to(target.device)
+
         error = target - actual
         adjust = torch.einsum("bi,bj->ij", target, error)
         for module in modules:
