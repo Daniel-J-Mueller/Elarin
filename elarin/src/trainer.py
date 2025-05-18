@@ -86,9 +86,14 @@ class Trainer:
 
                 p.mul_(self.decay)
 
-                rows = min(p.shape[0], adjust.shape[0])
-                cols = min(p.shape[1], adjust.shape[1])
-                p[:rows, :cols].add_(self.lr * adjust.to(p.device)[:rows, :cols])
+                if p.ndim == 1:
+                    length = min(p.shape[0], error.shape[1])
+                    grad = error.mean(dim=0).to(p.device)[:length]
+                    p[:length].add_(self.lr * grad)
+                else:
+                    rows = min(p.shape[0], adjust.shape[0])
+                    cols = min(p.shape[1], adjust.shape[1])
+                    p[:rows, :cols].add_(self.lr * adjust.to(p.device)[:rows, :cols])
 
 
 if __name__ == "__main__":
