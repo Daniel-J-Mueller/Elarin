@@ -36,4 +36,7 @@ def load_config(path: str) -> Dict[str, Any]:
     if "models" in cfg:
         cfg["models"] = {k: resolve(v) for k, v in cfg["models"].items()}
 
+    if "persistent_dir" in cfg:
+        cfg["persistent_dir"] = resolve(cfg["persistent_dir"])
+
     return cfg
