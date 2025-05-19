@@ -25,11 +25,11 @@ class BrocasArea:
         hidden: torch.Tensor,
         temperature: float = 1.0,
         num_samples: int = 1,
-    ) -> Iterable[tuple[str, float]]:
+    ) -> Iterable[tuple[str, float, int]]:
         """Generate one or more tokens from ``hidden``.
 
-        Returns an iterable of ``(text, probability)`` tuples. ``num_samples``
-        controls how many speculative tokens are produced.
+        Returns an iterable of ``(text, probability, token_id)`` tuples.
+        ``num_samples`` controls how many speculative tokens are produced.
         """
         embeds = hidden.to(self.device)
         if embeds.dim() == 2:
@@ -44,7 +44,7 @@ class BrocasArea:
         sample_ids = torch.multinomial(probs, num_samples=num_samples, replacement=True).squeeze(0)
         sample_probs = probs.squeeze(0)[sample_ids]
         tokens = [self.tokenizer.decode([tok_id], skip_special_tokens=True) for tok_id in sample_ids]
-        return list(zip(tokens, sample_probs.cpu().tolist()))
+        return list(zip(tokens, sample_probs.cpu().tolist(), sample_ids.cpu().tolist()))
 
 if __name__ == "__main__":
     area = BrocasArea("../models/gpt2")

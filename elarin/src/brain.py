@@ -46,7 +46,11 @@ def main() -> None:
     retina = Retina(models["clip"], device=devices["retina"])
     occipital = OccipitalLobe(device=devices["occipital_lobe"])
 
-    wernicke = WernickesArea(models["gpt2"], device=devices["language_areas"])
+    wernicke = WernickesArea(
+        models["gpt2"],
+        device=devices["language_areas"],
+        token_table_path=f"{persist_dir}/token_embeddings.npy",
+    )
 
     dmn = DefaultModeNetwork(intero_dim=768, hidden_dim=2048, output_dim=768, num_layers=4).to(devices["dmn"])
     # Weight sensory inputs slightly higher than internal interoceptive signals
