@@ -59,9 +59,11 @@ class MotorCortex:
         """Generate speculative tokens and return the chosen one.
 
         Each candidate token is re-embedded via :class:`WernickesArea` so that
-        its semantic representation can be compared against ``hidden``.  The
-        candidate whose meaning best matches the provided context is selected
-        and only that embedding is fed back into the rest of the system.
+        its semantic representation can be compared against ``hidden``. All
+        candidate embeddings are returned for training, while only the best
+        matching token is printed and looped back into the cortex. This
+        preserves rich learning signal from every candidate without flooding the
+        output stream.
 
         Parameters
         ----------
@@ -123,8 +125,11 @@ class MotorCortex:
     ) -> None:
         """Align motor output with visual and auditory context.
 
-        ``motor_embs`` may contain embeddings for multiple speculative tokens.
-        Each is aligned independently to reinforce all candidates.
+        ``motor_embs`` contains the embeddings for *all* speculative tokens
+        generated during :meth:`act`. Each candidate token contributes to
+        adaptation by being aligned separately against the visual and auditory
+        cues. This ensures learning incorporates every possibility even though
+        only one token is ultimately emitted.
         """
         vision_target = self.vision_to_text(vision_feat.to(self.device))
         for emb in motor_embs:

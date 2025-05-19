@@ -38,9 +38,12 @@ class BrocasArea:
         logits = outputs.logits / max(temperature, 1e-5)
         probs = torch.softmax(logits, dim=-1).squeeze(1)
 
-        sample_ids = torch.multinomial(probs, num_samples=num_samples, replacement=True)
-        sample_probs = torch.gather(probs, 1, sample_ids)
-        tokens = self.tokenizer.batch_decode(sample_ids, skip_special_tokens=True)
+        # ``torch.multinomial`` with ``num_samples > 1`` would produce a single
+        # sequence containing multiple tokens.  We instead sample tokens
+        # independently so that each candidate represents exactly one token.
+        sample_ids = torch.multinomial(probs, num_samples=num_samples, replacement=True).squeeze(0)
+        sample_probs = probs.squeeze(0)[sample_ids]
+        tokens = [self.tokenizer.decode([tok_id], skip_special_tokens=True) for tok_id in sample_ids]
         return list(zip(tokens, sample_probs.cpu().tolist()))
 
 if __name__ == "__main__":
