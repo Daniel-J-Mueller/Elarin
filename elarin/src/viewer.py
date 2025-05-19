@@ -38,10 +38,12 @@ class Viewer:
             (0, 0, 0),
             (0, self.height, self.width, self.bar_height + self.input_height),
         )
-        txt_surf = self.font.render(text, True, (255, 255, 255))
-        self.screen.blit(txt_surf, (5, self.height + 5))
-        input_surf = self.font.render(self.input_buffer, True, (255, 255, 255))
-        self.screen.blit(input_surf, (5, self.height + self.bar_height + 5))
+        if text:
+            txt_surf = self.font.render(text, True, (255, 255, 255))
+            self.screen.blit(txt_surf, (5, self.height + 5))
+        if self.input_buffer:
+            input_surf = self.font.render(self.input_buffer, True, (255, 255, 255))
+            self.screen.blit(input_surf, (5, self.height + self.bar_height + 5))
         meter_h = self.bar_height - 10
         level = int(max(0.0, min(1.0, audio_level)) * meter_h)
         pygame.draw.rect(
