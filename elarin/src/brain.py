@@ -4,7 +4,6 @@ from PIL import Image
 import torch
 import time
 import cv2
-import sounddevice as sd
 import numpy as np
 from pathlib import Path
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
@@ -23,6 +22,7 @@ from .utils.config import load_config
 from .utils.logger import get_logger
 from .viewer import Viewer
 from .utils.camera import Camera
+from .utils.audio_buffer import AudioBuffer
 
 
 def main() -> None:
@@ -91,6 +91,7 @@ def main() -> None:
     asr_device = devices.get("cochlea", "cpu")
     asr_model.to(asr_device)
     asr_model.eval()
+    audio_buf = AudioBuffer(samplerate=16000, channels=1, buffer_seconds=audio_duration * 2)
 
     try:
         while True:
@@ -111,9 +112,7 @@ def main() -> None:
                 frame_rgb = np.zeros((224, 224, 3), dtype=np.uint8)
                 vision_feat = torch.zeros(1, 128, device=devices["occipital_lobe"])
 
-            audio_samples = sd.rec(int(audio_duration * 16000), samplerate=16000, channels=1)
-            sd.wait()
-            audio_np = audio_samples.squeeze().astype(np.float32)
+            audio_np = audio_buf.read(audio_duration)
             # Compute a simple RMS volume estimate and boost the gain for display
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
             inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
@@ -232,6 +231,7 @@ def main() -> None:
             cam.release()
         if viewer:
             viewer.close()
+        audio_buf.close()
         hippocampus.save()
         motor.save()
         augmenter.save()
