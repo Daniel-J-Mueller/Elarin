@@ -38,8 +38,13 @@ class Viewer:
             (0, 0, 0),
             (0, self.height, self.width, self.bar_height + self.input_height),
         )
-        if text:
-            txt_surf = self.font.render(text, True, (255, 255, 255))
+        clean_text = text.strip()
+        if clean_text:
+            try:
+                txt_surf = self.font.render(clean_text, True, (255, 255, 255))
+            except pygame.error:
+                # fall back to a placeholder to avoid crashing on odd tokens
+                txt_surf = self.font.render("[?]", True, (255, 255, 255))
             self.screen.blit(txt_surf, (5, self.height + 5))
         if self.input_buffer:
             input_surf = self.font.render(self.input_buffer, True, (255, 255, 255))
