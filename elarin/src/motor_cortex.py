@@ -123,7 +123,11 @@ class MotorCortex:
         """
         vision_target = self.vision_to_text(vision_feat.to(self.device))
         for emb in motor_embs:
-            emb = emb.unsqueeze(0)
+            # ``motor_embs`` may be 2-D (seq_len, hidden) when multiple
+            # tokens were generated for a candidate. ``Trainer.align``
+            # expects a batch of 1-D embeddings so average over the
+            # sequence dimension to collapse it to shape ``(1, hidden)``.
+            emb = emb.mean(dim=0, keepdim=True)
             trainer.align(
                 [self.area.model.transformer, self.vision_to_text],
                 vision_target,
