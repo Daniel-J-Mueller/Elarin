@@ -58,6 +58,11 @@ class MotorCortex:
     ) -> tuple[str, torch.Tensor, torch.Tensor, int]:
         """Generate speculative tokens and return the chosen one.
 
+        Each candidate token is re-embedded via :class:`WernickesArea` so that
+        its semantic representation can be compared against ``hidden``.  The
+        candidate whose meaning best matches the provided context is selected
+        and only that embedding is fed back into the rest of the system.
+
         Parameters
         ----------
         hidden:
@@ -90,23 +95,23 @@ class MotorCortex:
             self.area.decode(hidden.to(self.device), temperature=temp, num_samples=n)
         )
         texts = [t for t, _ in candidates]
-        probs = [p for _, p in candidates]
-        best_idx = int(torch.tensor(probs).argmax().item())
+
+        # Re-encode each candidate through Wernicke's Area to obtain semantic
+        # embeddings for comparison with the DMN context.
+        enc = self.wernicke.encode(texts)
+        enc_means = enc.mean(dim=1)
+
+        # Select the candidate whose meaning most closely matches the context.
+        context_vec = hidden.to(enc_means.device)
+        if context_vec.dim() == 3:
+            context_vec = context_vec.mean(dim=1)
+        sims = torch.nn.functional.cosine_similarity(enc_means, context_vec.squeeze(0), dim=1)
+        best_idx = int(torch.argmax(sims).item())
         best_text = texts[best_idx]
         self.logger.info(best_text)
 
-        tok_ids = (
-            self.wernicke.tokenizer(
-                texts,
-                add_special_tokens=False,
-                return_tensors="pt",
-            )
-            .input_ids.to(self.wernicke.device)
-        )
-
-        embs = self.wernicke.model.get_input_embeddings()(tok_ids)
-        chosen_emb = embs[best_idx : best_idx + 1]
-        return best_text, chosen_emb, embs, best_idx
+        chosen_emb = enc[best_idx : best_idx + 1]
+        return best_text, chosen_emb, enc, best_idx
 
     @torch.no_grad()
     def learn_from_feedback(
@@ -123,18 +128,17 @@ class MotorCortex:
         """
         vision_target = self.vision_to_text(vision_feat.to(self.device))
         for emb in motor_embs:
-            # ``motor_embs`` may be 2-D (seq_len, hidden) when multiple
-            # tokens were generated for a candidate. ``Trainer.align``
-            # expects a batch of 1-D embeddings so average over the
-            # sequence dimension to collapse it to shape ``(1, hidden)``.
-            emb = emb.mean(dim=0, keepdim=True)
-            trainer.align(
-                [self.area.model.transformer, self.vision_to_text],
-                vision_target,
-                emb,
-            )
-            trainer.align(
-                [self.area.model.transformer],
-                audio_emb.to(self.device),
-                emb,
-            )
+            # ``emb`` has shape ``(seq_len, hidden)``. Preserve token-level
+            # information by aligning each token separately.
+            for tok in emb:
+                tok = tok.unsqueeze(0)
+                trainer.align(
+                    [self.area.model.transformer, self.vision_to_text],
+                    vision_target,
+                    tok,
+                )
+                trainer.align(
+                    [self.area.model.transformer],
+                    audio_emb.to(self.device),
+                    tok,
+                )
