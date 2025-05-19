@@ -18,6 +18,7 @@ from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .hippocampus import Hippocampus
 from .thalamus import Thalamus
 from .trainer import Trainer
+from .temporal_lobe import TemporalLobe
 from .utils.config import load_config
 from .utils.logger import get_logger
 from .viewer import Viewer
@@ -67,6 +68,7 @@ def main() -> None:
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
+    temporal = TemporalLobe()
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
@@ -151,8 +153,11 @@ def main() -> None:
                     wernicke.model.config.n_embd,
                     device=wernicke.device,
                 )
-            text_emb = augmenter(text_emb)
-            thalamus.submit("audio", text_emb)
+            user_emb = augmenter(text_emb)
+            spec_emb = temporal.embedding(wernicke)
+            spec_emb = augmenter(spec_emb)
+            combined_audio = 0.5 * (user_emb + spec_emb)
+            thalamus.submit("audio", combined_audio)
 
             vision = thalamus.relay("vision")
             if vision is None:
@@ -162,7 +167,7 @@ def main() -> None:
 
             audio = thalamus.relay("audio")
             if audio is None:
-                audio = torch.zeros(1, text_emb.size(-1), device=dmn_device)
+                audio = torch.zeros(1, user_emb.size(-1), device=dmn_device)
             else:
                 audio = audio.to(dmn_device)
 
@@ -186,10 +191,12 @@ def main() -> None:
                     if modality in recalled:
                         thalamus.submit(modality, torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0))
 
-            out_text, out_emb, cand_embs, best_idx = motor.act(context)
+            out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
+            temporal.add_speculation(cand_texts)
+            temporal.consume(out_text)
             cand_aug = augmenter(cand_embs)
             out_aug = cand_aug[best_idx : best_idx + 1]
-            motor.learn_from_feedback(vision_feat, text_emb, cand_aug, trainer)
+            motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
 
             hippocampus.add_episode(
                 {

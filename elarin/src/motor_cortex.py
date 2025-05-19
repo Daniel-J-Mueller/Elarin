@@ -78,10 +78,11 @@ class MotorCortex:
         Returns
         -------
         tuple
-            ``(text, chosen_emb, all_embs, index)`` where ``text`` is the
+            ``(text, chosen_emb, all_embs, index, texts)`` where ``text`` is the
             selected string, ``chosen_emb`` is its embedding, ``all_embs`` are
-            embeddings for every candidate, and ``index`` is the chosen
-            candidate's position within ``all_embs``.
+            embeddings for every candidate, ``index`` is the chosen candidate's
+            position within ``all_embs`` and ``texts`` contains every
+            speculative token.
         """
 
         temp = temperature
@@ -126,7 +127,7 @@ class MotorCortex:
 
         self.logger.info(best_text)
         chosen_emb = enc[best_idx : best_idx + 1]
-        return best_text, chosen_emb, enc, best_idx
+        return best_text, chosen_emb, enc, best_idx, texts
 
     @torch.no_grad()
     def learn_from_feedback(
