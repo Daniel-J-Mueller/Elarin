@@ -9,3 +9,4 @@ opencv-python
 sounddevice
 openai-whisper
 pygame
+tqdm
