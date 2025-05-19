@@ -51,7 +51,7 @@ def main(argv: Iterable[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Generate Wernicke token table")
     parser.add_argument("--model_dir", default="models/gpt2")
     parser.add_argument("--output", default="elarin/persistent/token_embeddings.npy")
-    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--device", default="cuda")
     args = parser.parse_args(argv)
 
     generate(args.model_dir, Path(args.output), device=args.device)
