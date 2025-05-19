@@ -100,6 +100,11 @@ prints the motor cortex output. A viewer window powered by ``pygame``
 displays the live camera feed with an audio level meter and text overlay.
 Press ``Ctrl+C`` to end the demo.
 
+The ``settings`` section of ``configs/default.yaml`` now includes
+``motor_candidates`` which controls how many speculative tokens the motor
+cortex generates each step. Increasing this value trains on multiple
+possible outputs while only printing the highest-probability token.
+
 All learned memories and adapter weights are automatically written to the
 ``elarin/persistent/`` directory so progress can be resumed on the next
 launch. Removing that directory resets the brain back to its initial

@@ -35,6 +35,7 @@ def main() -> None:
     audio_duration = float(settings.get("audio_duration", 1.0))
     debug_no_video = bool(settings.get("debug_no_video", False))
     hippocampus_capacity = int(settings.get("hippocampus_capacity", 1000))
+    motor_candidates = int(settings.get("motor_candidates", 1))
 
     if not persist_dir.is_absolute():
         from .utils.config import BASE_DIR
@@ -72,6 +73,7 @@ def main() -> None:
         device=devices["motor_cortex"],
         axis=axis,
         persist_path=f"{persist_dir}/motor.pt",
+        num_candidates=motor_candidates,
     )
 
     thalamus = Thalamus()
@@ -180,9 +182,10 @@ def main() -> None:
                     if modality in recalled:
                         thalamus.submit(modality, torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0))
 
-            out_text, out_emb = motor.act(context)
-            out_aug = augmenter(out_emb)
-            motor.learn_from_feedback(vision_feat, text_emb, out_aug, trainer)
+            out_text, out_emb, cand_embs, best_idx = motor.act(context)
+            cand_aug = augmenter(cand_embs)
+            out_aug = cand_aug[best_idx : best_idx + 1]
+            motor.learn_from_feedback(vision_feat, text_emb, cand_aug, trainer)
 
             hippocampus.add_episode(
                 {
@@ -195,16 +198,17 @@ def main() -> None:
             )
             thalamus.submit("intero", out_aug)
             trainer.step([dmn.fusion, augmenter], context)
-            # Align DMN output with the embedding of the generated token so
-            # future contexts better predict the next word. ``Trainer.align``
-            # updates parameters to make ``actual`` closer to ``target``.  The
-            # token embedding (``out_emb``) therefore acts as the desired
-            # target while the DMN context serves as the current prediction.
-            trainer.align(
-                [dmn.fusion, motor.area.model.transformer, augmenter],
-                out_aug,
-                context,
-            )
+            # Align DMN output with the embeddings of the speculative tokens so
+            # future contexts better predict likely next words. ``Trainer.align``
+            # updates parameters to make ``actual`` closer to ``target``. Each
+            # candidate embedding acts as a desired target while the DMN context
+            # serves as the current prediction.
+            for emb in cand_aug:
+                trainer.align(
+                    [dmn.fusion, motor.area.model.transformer, augmenter],
+                    emb.unsqueeze(0),
+                    context,
+                )
 
             hippocampus.decay()
 
