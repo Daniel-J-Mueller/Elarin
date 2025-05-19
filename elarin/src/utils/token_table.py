@@ -5,17 +5,29 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Iterable, Dict, Any
+from typing import Iterable
 
 import numpy as np
 import torch
 from transformers import GPT2Tokenizer, GPT2Model
 
+# Resolve the base directory of the ``elarin`` package so relative paths work
+# regardless of the current working directory.
+BASE_DIR = Path(__file__).resolve().parents[2]
 
-def generate(model_dir: str, output: Path, device: str = "cpu") -> None:
+
+def generate(model_dir: str | Path, output: Path, device: str = "cpu") -> None:
     """Create a table of embeddings for every tokenizer token."""
-    tokenizer = GPT2Tokenizer.from_pretrained(model_dir)
-    model = GPT2Model.from_pretrained(model_dir)
+    model_path = Path(model_dir)
+    if not model_path.is_absolute():
+        model_path = BASE_DIR / model_path
+
+    output_path = output
+    if not output_path.is_absolute():
+        output_path = BASE_DIR / output_path
+
+    tokenizer = GPT2Tokenizer.from_pretrained(model_path)
+    model = GPT2Model.from_pretrained(model_path)
     model.to(device)
     model.eval()
 
@@ -30,9 +42,9 @@ def generate(model_dir: str, output: Path, device: str = "cpu") -> None:
             embeddings[tok_id] = emb.astype(np.float32)
             tokens.append(tokenizer.decode([tok_id], skip_special_tokens=False))
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    np.save(output, {"tokens": tokens, "embeddings": embeddings}, allow_pickle=True)
-    print(f"saved {len(tokens)} embeddings to {output}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(output_path, {"tokens": tokens, "embeddings": embeddings}, allow_pickle=True)
+    print(f"saved {len(tokens)} embeddings to {output_path}")
 
 
 def main(argv: Iterable[str] | None = None) -> None:
