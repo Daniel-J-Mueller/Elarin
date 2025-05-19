@@ -204,9 +204,14 @@ def main() -> None:
             # candidate embedding acts as a desired target while the DMN context
             # serves as the current prediction.
             for emb in cand_aug:
+                # ``cand_aug`` has shape ``(num_candidates, seq_len, hidden)``
+                # but ``Trainer.align`` expects a batch of 1-D embeddings.
+                # Collapse the sequence dimension so each candidate embedding
+                # is ``(1, hidden)`` before alignment.
+                emb = emb.mean(dim=0, keepdim=True)
                 trainer.align(
                     [dmn.fusion, motor.area.model.transformer, augmenter],
-                    emb.unsqueeze(0),
+                    emb,
                     context,
                 )
 
