@@ -56,14 +56,14 @@ class MotorCortex:
         temperature: float | None = None,
         num_candidates: int | None = None,
     ) -> tuple[str, torch.Tensor, torch.Tensor, int]:
-        """Generate speculative tokens and return the chosen one.
+        """Return the token whose embedding best matches ``hidden``.
 
-        Each candidate token is re-embedded via :class:`WernickesArea` so that
-        its semantic representation can be compared against ``hidden``. All
-        candidate embeddings are returned for training, while only the best
-        matching token is printed and looped back into the cortex. This
-        preserves rich learning signal from every candidate without flooding the
-        output stream.
+        When the precomputed token table is available, similarity against the
+        entire vocabulary determines the most appropriate token. Otherwise the
+        method falls back to sampling candidate tokens from Broca's area and
+        selecting the closest one via :class:`WernickesArea`. The embeddings for
+        the ``num_candidates`` closest tokens are returned for training so that
+        alignment can reinforce context associations.
 
         Parameters
         ----------
@@ -93,29 +93,38 @@ class MotorCortex:
 
         n = num_candidates if num_candidates is not None else self.num_candidates
 
-        candidates = list(
-            self.area.decode(hidden.to(self.device), temperature=temp, num_samples=n)
-        )
-        texts = [t for t, _, _ in candidates]
-        ids = [tid for _, _, tid in candidates]
-
-        # Re-embed each candidate via the precomputed table when available.
         if self.wernicke.token_table is not None:
-            enc = self.wernicke.lookup_tokens(ids)
-            enc_means = enc.squeeze(1)
+            # Directly pick the most similar tokens from the precomputed table
+            table = self.wernicke.token_table
+            context_vec = hidden.to(table.device)
+            if context_vec.dim() == 3:
+                context_vec = context_vec.mean(dim=1)
+            context_vec = context_vec.squeeze(0)
+            sims = torch.nn.functional.cosine_similarity(table, context_vec, dim=1)
+            sims = sims / max(temp, 1e-5)
+            topk = torch.topk(sims, k=n)
+            ids = topk.indices.tolist()
+            texts = [self.wernicke.tokenizer.decode([i], skip_special_tokens=True) for i in ids]
+            enc = table[ids].unsqueeze(1)
+            best_idx = 0
+            best_text = texts[0]
         else:
+            # Fall back to sampling via Broca's area when no table is available
+            candidates = list(
+                self.area.decode(hidden.to(self.device), temperature=temp, num_samples=n)
+            )
+            texts = [t for t, _, _ in candidates]
+            ids = [tid for _, _, tid in candidates]
             enc = self.wernicke.encode(texts)
             enc_means = enc.mean(dim=1)
+            context_vec = hidden.to(enc_means.device)
+            if context_vec.dim() == 3:
+                context_vec = context_vec.mean(dim=1)
+            sims = torch.nn.functional.cosine_similarity(enc_means, context_vec.squeeze(0), dim=1)
+            best_idx = int(torch.argmax(sims).item())
+            best_text = texts[best_idx]
 
-        # Select the candidate whose meaning most closely matches the context.
-        context_vec = hidden.to(enc_means.device)
-        if context_vec.dim() == 3:
-            context_vec = context_vec.mean(dim=1)
-        sims = torch.nn.functional.cosine_similarity(enc_means, context_vec.squeeze(0), dim=1)
-        best_idx = int(torch.argmax(sims).item())
-        best_text = texts[best_idx]
         self.logger.info(best_text)
-
         chosen_emb = enc[best_idx : best_idx + 1]
         return best_text, chosen_emb, enc, best_idx
 
