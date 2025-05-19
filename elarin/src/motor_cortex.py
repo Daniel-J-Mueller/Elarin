@@ -96,12 +96,16 @@ class MotorCortex:
         candidates = list(
             self.area.decode(hidden.to(self.device), temperature=temp, num_samples=n)
         )
-        texts = [t for t, _ in candidates]
+        texts = [t for t, _, _ in candidates]
+        ids = [tid for _, _, tid in candidates]
 
-        # Re-encode each candidate through Wernicke's Area to obtain semantic
-        # embeddings for comparison with the DMN context.
-        enc = self.wernicke.encode(texts)
-        enc_means = enc.mean(dim=1)
+        # Re-embed each candidate via the precomputed table when available.
+        if self.wernicke.token_table is not None:
+            enc = self.wernicke.lookup_tokens(ids)
+            enc_means = enc.squeeze(1)
+        else:
+            enc = self.wernicke.encode(texts)
+            enc_means = enc.mean(dim=1)
 
         # Select the candidate whose meaning most closely matches the context.
         context_vec = hidden.to(enc_means.device)
