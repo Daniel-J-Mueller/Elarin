@@ -20,25 +20,28 @@ class BrocasArea:
         self.device = device
 
     @torch.no_grad()
-    def decode(self, hidden: torch.Tensor, temperature: float = 1.0) -> Iterable[str]:
-        """Generate text from hidden state embeddings.
+    def decode(
+        self,
+        hidden: torch.Tensor,
+        temperature: float = 1.0,
+        num_samples: int = 1,
+    ) -> Iterable[tuple[str, float]]:
+        """Generate one or more tokens from ``hidden``.
 
-        ``temperature`` adjusts the sampling distribution.  A value of ``1.0``
-        corresponds to the model's default logits while higher values yield more
-        random output.  ``temperature`` must be > 0.
+        Returns an iterable of ``(text, probability)`` tuples. ``num_samples``
+        controls how many speculative tokens are produced.
         """
         embeds = hidden.to(self.device)
         if embeds.dim() == 2:
-            # ``GPT2LMHeadModel`` expects a sequence dimension. When a single
-            # embedding is provided, add a length-1 dimension.
             embeds = embeds.unsqueeze(1)
         outputs = self.model(inputs_embeds=embeds)
         logits = outputs.logits / max(temperature, 1e-5)
-        probs = torch.softmax(logits, dim=-1)
-        # ``multinomial`` expects a 2D tensor. Squeeze the sequence dimension for
-        # single-token decoding.
-        sample = torch.multinomial(probs.squeeze(1), num_samples=1)
-        return self.tokenizer.batch_decode(sample, skip_special_tokens=True)
+        probs = torch.softmax(logits, dim=-1).squeeze(1)
+
+        sample_ids = torch.multinomial(probs, num_samples=num_samples, replacement=True)
+        sample_probs = torch.gather(probs, 1, sample_ids)
+        tokens = self.tokenizer.batch_decode(sample_ids, skip_special_tokens=True)
+        return list(zip(tokens, sample_probs.cpu().tolist()))
 
 if __name__ == "__main__":
     area = BrocasArea("../models/gpt2")

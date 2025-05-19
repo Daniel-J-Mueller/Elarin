@@ -21,6 +21,7 @@ class MotorCortex:
         device: str = "cpu",
         axis: HypothalamusPituitaryAxis | None = None,
         persist_path: str | None = None,
+        num_candidates: int = 1,
     ) -> None:
         self.logger = get_logger("motor_cortex")
         self.area = BrocasArea(model_dir, device=device)
@@ -33,6 +34,7 @@ class MotorCortex:
             self.area.model.load_state_dict(state.get("broca", {}), strict=False)
             self.vision_to_text.load_state_dict(state.get("vision_to_text", {}), strict=False)
         self.persist_path = persist_path
+        self.num_candidates = max(1, int(num_candidates))
         
     def save(self, path: str | None = None) -> None:
         """Save adapter parameters for later reloading."""
@@ -48,46 +50,87 @@ class MotorCortex:
         )
 
     @torch.no_grad()
-    def act(self, hidden: torch.Tensor, temperature: float | None = None) -> tuple[str, torch.Tensor]:
-        """Generate a token from ``hidden`` and return it with its embedding."""
+    def act(
+        self,
+        hidden: torch.Tensor,
+        temperature: float | None = None,
+        num_candidates: int | None = None,
+    ) -> tuple[str, torch.Tensor, torch.Tensor, int]:
+        """Generate speculative tokens and return the chosen one.
+
+        Parameters
+        ----------
+        hidden:
+            Context embedding from the DMN.
+        temperature:
+            Optional sampling temperature.  ``None`` uses the current
+            norepinephrine level.
+        num_candidates:
+            Number of speculative tokens to generate.  When ``None`` the
+            ``MotorCortex`` instance's ``num_candidates`` value is used.
+        Returns
+        -------
+        tuple
+            ``(text, chosen_emb, all_embs, index)`` where ``text`` is the
+            selected string, ``chosen_emb`` is its embedding, ``all_embs`` are
+            embeddings for every candidate, and ``index`` is the chosen
+            candidate's position within ``all_embs``.
+        """
+
         temp = temperature
         if temp is None:
             if self.axis is not None:
                 temp = 1.0 + float(self.axis.norepinephrine)
             else:
                 temp = 1.0
-        text = next(
-            iter(self.area.decode(hidden.to(self.device), temperature=temp))
+
+        n = num_candidates if num_candidates is not None else self.num_candidates
+
+        candidates = list(
+            self.area.decode(hidden.to(self.device), temperature=temp, num_samples=n)
         )
-        self.logger.info(text)
-        # Convert the generated token back to its ID and pull the corresponding
-        # embedding directly from Wernicke's input layer so that only the most
-        # recent token influences the next context step.
-        tok_id = self.wernicke.tokenizer(
-            text,
-            add_special_tokens=False,
-            return_tensors="pt",
-        ).input_ids.to(self.wernicke.device)[0, -1]
-        loop_emb = self.wernicke.model.get_input_embeddings()(tok_id.unsqueeze(0))
-        return text, loop_emb
+        texts = [t for t, _ in candidates]
+        probs = [p for _, p in candidates]
+        best_idx = int(torch.tensor(probs).argmax().item())
+        best_text = texts[best_idx]
+        self.logger.info(best_text)
+
+        tok_ids = (
+            self.wernicke.tokenizer(
+                texts,
+                add_special_tokens=False,
+                return_tensors="pt",
+            )
+            .input_ids.to(self.wernicke.device)
+        )
+
+        embs = self.wernicke.model.get_input_embeddings()(tok_ids)
+        chosen_emb = embs[best_idx : best_idx + 1]
+        return best_text, chosen_emb, embs, best_idx
 
     @torch.no_grad()
     def learn_from_feedback(
         self,
         vision_feat: torch.Tensor,
         audio_emb: torch.Tensor,
-        motor_emb: torch.Tensor,
+        motor_embs: torch.Tensor,
         trainer: Trainer,
     ) -> None:
-        """Align motor output with visual and auditory context."""
+        """Align motor output with visual and auditory context.
+
+        ``motor_embs`` may contain embeddings for multiple speculative tokens.
+        Each is aligned independently to reinforce all candidates.
+        """
         vision_target = self.vision_to_text(vision_feat.to(self.device))
-        trainer.align(
-            [self.area.model.transformer, self.vision_to_text],
-            vision_target,
-            motor_emb,
-        )
-        trainer.align(
-            [self.area.model.transformer],
-            audio_emb.to(self.device),
-            motor_emb,
-        )
+        for emb in motor_embs:
+            emb = emb.unsqueeze(0)
+            trainer.align(
+                [self.area.model.transformer, self.vision_to_text],
+                vision_target,
+                emb,
+            )
+            trainer.align(
+                [self.area.model.transformer],
+                audio_emb.to(self.device),
+                emb,
+            )
