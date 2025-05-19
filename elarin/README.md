@@ -46,7 +46,17 @@ The script downloads the following models sequentially:
    - `openai/whisper-small`
    - `gpt2`
 
-3. **Run the Demo**
+3. **Precompute Token Embeddings**
+
+   This optional step generates a lookup table of GPT-2 token embeddings used by
+   the language areas. The output is written to
+   ``elarin/persistent/token_embeddings.npy``.
+
+   ```bash
+   python elarin/src/utils/token_table.py
+   ```
+
+4. **Run the Demo**
 
    Execute the minimal integration test from the repository root (the
    directory containing the ``elarin`` folder). This command launches
