@@ -52,7 +52,12 @@ class Hippocampus:
                 scores.append(-1.0)
                 continue
             m = ep[modality]
-            score = float(np.dot(emb, m) / (np.linalg.norm(emb) * np.linalg.norm(m) + 1e-8))
+            if m.ndim > 1:
+                m = m.mean(axis=0)
+            score = float(
+                np.dot(emb, m)
+                / (np.linalg.norm(emb) * np.linalg.norm(m) + 1e-8)
+            )
             scores.append(score)
 
         idx = np.argsort(scores)[-k:][::-1]
@@ -60,6 +65,8 @@ class Hippocampus:
         for i in idx:
             ep = self.memory[i]
             for m, val in ep.items():
+                if val.ndim > 1:
+                    val = val.mean(axis=0)
                 collected.setdefault(m, []).append(val)
 
         return {
