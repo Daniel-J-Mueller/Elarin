@@ -1,4 +1,4 @@
-"""Simple integration demo linking sensors, DMN and motor cortex."""
+"""Main integration loop linking sensors, DMN and motor cortex."""
 
 from PIL import Image
 import torch
@@ -528,7 +528,7 @@ def main() -> None:
                 )
             time.sleep(loop_interval)
     except KeyboardInterrupt:
-        logger.info("demo interrupted")
+        logger.info("run interrupted")
     finally:
         if cam:
             cam.release()

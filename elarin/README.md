@@ -56,9 +56,9 @@ The script downloads the following models sequentially:
    python elarin/src/utils/token_table.py
    ```
 
-4. **Run the Demo**
+4. **Run the Brain**
 
-   Execute the minimal integration test from the repository root (the
+   Execute the main integration loop from the repository root (the
    directory containing the ``elarin`` folder). This command launches
    the brain and starts a small PyGame viewer window while also printing
    the motor cortex output.  The window updates continuously until you
@@ -102,13 +102,13 @@ outlined in `AGENTS.md`.
 
 Elarin is a work in progress; contributions and experimentation are welcome.
 
-### Quick Demo
+### Running Elarin
 
-Running ``python -m elarin.src.brain`` executes a minimal integration
-test that loads the decapitated models, fuses a dummy image with text and
-prints the motor cortex output. A viewer window powered by ``pygame``
+Running ``python -m elarin.src.brain`` starts the full integration
+loop, loading the decapitated models, fusing a dummy image with text and
+printing the motor cortex output. A viewer window powered by ``pygame``
 displays the live camera feed with an audio level meter and text overlay.
-Press ``Ctrl+C`` to end the demo.
+Press ``Ctrl+C`` to stop the brain.
 
 The ``settings`` section of ``configs/default.yaml`` now includes
 ``motor_candidates`` which controls how many speculative tokens the motor
