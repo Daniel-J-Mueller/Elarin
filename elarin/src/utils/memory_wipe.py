@@ -21,6 +21,7 @@ def wipe(persist_dir: str | Path | None = None) -> None:
     removed = False
     for filename in (
         "hippocampus.npy",
+        "hippocampus.npz",
         "motor.pt",
         "angular_gyrus.pt",
         "insular.pt",

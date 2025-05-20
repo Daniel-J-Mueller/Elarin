@@ -92,7 +92,7 @@ def main() -> None:
             "speech": 768,
         },
         capacity=hippocampus_capacity,
-        persist_path=f"{persist_dir}/hippocampus.npy",
+        persist_path=f"{persist_dir}/hippocampus.npz",
     )
     amygdala = Amygdala(device=devices["dmn"])
     pfc = PrefrontalCortex(device=devices["dmn"])

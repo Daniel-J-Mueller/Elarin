@@ -17,19 +17,31 @@ except Exception:  # pragma: no cover - optional dependency
 class Hippocampus:
     """Episodic memory storing embeddings for multiple modalities."""
 
-    def __init__(self, dims: Dict[str, int], capacity: int = 1000, persist_path: Optional[str] = None, use_faiss: bool = True) -> None:
+    def __init__(
+        self,
+        dims: Dict[str, int],
+        capacity: int = 1000,
+        persist_path: Optional[str] = None,
+        use_faiss: bool = True,
+        compressed: bool = True,
+    ) -> None:
         self.dims = dims
         self.capacity = capacity
         # Each entry is a mapping ``modality -> embedding`` plus optional ``valence``
         self.memory: List[Dict[str, np.ndarray | float]] = []
         self.persist_path = Path(persist_path) if persist_path else None
+        self.compressed = compressed
         self.use_faiss = use_faiss and faiss is not None
         self.index: Dict[str, "faiss.Index"] = {}
         self.mapping: Dict[str, List[int]] = {}
 
         if self.persist_path and self.persist_path.exists():
             try:
-                self.memory = np.load(self.persist_path, allow_pickle=True).tolist()
+                if self.persist_path.suffix == ".npz":
+                    data = np.load(self.persist_path, allow_pickle=True)
+                    self.memory = data["memory"].tolist()
+                else:
+                    self.memory = np.load(self.persist_path, allow_pickle=True).tolist()
             except Exception:
                 self.memory = []
 
@@ -146,4 +158,8 @@ class Hippocampus:
         if not self.persist_path:
             return
         self.persist_path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(self.persist_path, np.array(self.memory, dtype=object), allow_pickle=True)
+        arr = np.array(self.memory, dtype=object)
+        if self.compressed or self.persist_path.suffix == ".npz":
+            np.savez_compressed(self.persist_path, memory=arr)
+        else:
+            np.save(self.persist_path, arr, allow_pickle=True)
