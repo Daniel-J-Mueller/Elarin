@@ -39,6 +39,8 @@ class HypothalamusPituitaryAxis:
         self.error_avg = 0.0
         self.error_var = 1e-6
         self.baseline_avg = 0.0
+        self.memory_avg = 0.0
+        self.memory_var = 1e-6
 
     def step(self, novelty: float, error: float) -> None:
         """Update hormones using trend-adjusted novelty and error."""
@@ -145,3 +147,24 @@ class HypothalamusPituitaryAxis:
             self.serotonin,
             self.acetylcholine,
         )
+
+    def memory_pressure(self, usage_gb: float) -> None:
+        """Adjust hormones based on hippocampal memory usage.
+
+        Higher-than-usual usage indicates saturation, which should
+        raise serotonin and lower dopamine to curb further exploration.
+        """
+
+        self.memory_avg = (
+            1 - self.trend_rate
+        ) * self.memory_avg + self.trend_rate * usage_gb
+        self.memory_var = (
+            1 - self.trend_rate
+        ) * self.memory_var + self.trend_rate * (usage_gb - self.memory_avg) ** 2
+        delta = (usage_gb - self.memory_avg) / (self.memory_var**0.5 + 1e-6)
+
+        if delta > 0:
+            self.serotonin = 0.98 * self.serotonin + 0.02 * delta
+            self.dopamine = 0.98 * self.dopamine - 0.02 * delta
+            self.serotonin = max(0.0, min(1.0, self.serotonin))
+            self.dopamine = max(0.0, min(1.0, self.dopamine))

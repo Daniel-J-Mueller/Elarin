@@ -41,7 +41,9 @@ now record this baseline together with hippocampal footprint and hormone levels
 for long term analysis. SemanticFlow has been removed; speculative tokens are
 kept only in the temporal lobe. Newly added persistence hooks save LoRA weights
 for the amygdala, prefrontal cortex, corpus callosum, basal ganglia and
-cerebellum so their neurosymbolic adaptations survive restarts.
+cerebellum so their neurosymbolic adaptations survive restarts. Hormone levels
+now also respond to ``memory_pressure`` so serotonin rises when the hippocampus
+is saturated.
 
 ## 4. Data Flow Updates
 
@@ -60,6 +62,6 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 - Measure the impact of modality filtering and the unified Cochlea on reaction time, then refine the executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
 - Stress-test the ``DistributedHippocampus`` using the new memory usage reports and refine salience gating to prevent overload【F:human_brain_components_reference.txt†L108-L113】.
-- Continue tuning the neuroadaptive hormone logic so dopamine and norepinephrine track long term trends without oscillation. Hormone levels are now logged alongside the subthalamic baseline for later analysis【F:human_brain_components_reference.txt†L246-L250】.
+- Evaluate the new ``memory_pressure`` hook that raises serotonin and lowers dopamine as the hippocampus fills, ensuring stable neurotransmitter levels. Hormone levels are logged alongside the subthalamic baseline for later analysis【F:human_brain_components_reference.txt†L246-L250】.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
