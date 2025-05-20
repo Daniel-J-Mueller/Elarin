@@ -94,8 +94,15 @@ class Trainer:
         if target.device != actual.device:
             actual = actual.to(target.device)
 
-        error = target - actual
-        adjust = torch.einsum("bi,bj->ij", target, error)
+        t = target
+        a = actual
+        if t.dim() > 2:
+            t = t.mean(dim=1)
+        if a.dim() > 2:
+            a = a.mean(dim=1)
+
+        error = t - a
+        adjust = torch.einsum("bi,bj->ij", t, error)
         for module in modules:
             for p in module.parameters():
                 if not p.requires_grad:
