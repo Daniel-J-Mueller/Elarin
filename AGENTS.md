@@ -113,9 +113,11 @@ This file is the single source of truth for Elarin’s experiential architecture
   - Maintains an on-disk FAISS index of recent episodic embeddings.  
   - Supports rapid recall and rehearsal sampling.
 
-- **basal_ganglia.py**  
-  - Gating network for action “Go/No-Go.”  
+- **basal_ganglia.py**
+  - Gating network for action “Go/No-Go.”
   - Chunks sequential patterns and signals “motor permission.”
+- **cerebellum.py**
+  - Predicts corrective adjustments to motor output using visual cues.
 
 ### 3.7 Global Controllers  
 - **reticular_activating_system.py**  
