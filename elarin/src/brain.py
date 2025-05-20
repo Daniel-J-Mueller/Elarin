@@ -307,9 +307,10 @@ def main() -> None:
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
+                vis_as_motor = motor.vision_to_text(vision_feat.to(motor.device))
                 trainer.align(
                     [cerebellum.short_lora, cerebellum.long_lora],
-                    vision_feat.to(cerebellum.device),
+                    vis_as_motor.to(cerebellum.device),
                     out_aug.to(cerebellum.device),
                 )
                 motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
