@@ -16,6 +16,7 @@ from .language_areas.wernickes_area import WernickesArea
 from .language_areas.augmenter import LanguageAugmenter
 from .insular_cortex import InsularCortex
 from .basal_ganglia import BasalGanglia
+from .cerebellum import Cerebellum
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
@@ -106,6 +107,7 @@ def main() -> None:
         device=devices["motor_cortex"],
         persist_path=f"{persist_dir}/insula.pt",
     )
+    cerebellum = Cerebellum(device=devices.get("cerebellum", devices["motor_cortex"]))
     motor = MotorCortex(
         models["gpt2"],
         wernicke,
@@ -293,6 +295,7 @@ def main() -> None:
                 temporal.consume(out_text)
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
+                out_aug = cerebellum.adjust(out_aug, vision_feat)
                 motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
             else:
                 out_text = ""

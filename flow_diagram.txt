@@ -62,6 +62,12 @@ Basal Ganglia
   Output modality: go/no-go signal
   Fed into: Motor Cortex
 
+Cerebellum
+  Input modality: vision features and motor embeddings
+  Model: small MLP correcting motor output
+  Output modality: refined motor embedding
+  Fed into: Insular Cortex
+
 Reticular Activating System (RAS)
   Input modality: salience scores
   Model: threshold switch
@@ -107,6 +113,7 @@ Loops
 - Context Cortex feeds temporal embeddings back into DMN for ongoing context accumulation.
 - RAS adjusts Thalamic gating so processing becomes reactive to salience.
 - Basal Ganglia uses dopamine levels to decide when DMN context should reach the Motor Cortex.
+- Cerebellum refines motor feedback before it reaches interoception.
 
 Bootstrapping Models
 --------------------
