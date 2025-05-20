@@ -15,7 +15,7 @@ class Pons(nn.Module):
 
     def __init__(
         self,
-        input_dim: int = 128,
+        input_dim: int = 1,
         hidden_dim: int = 32,
         device: str = "cpu",
         persist_path: str | None = None,
