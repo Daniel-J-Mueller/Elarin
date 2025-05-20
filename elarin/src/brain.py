@@ -208,7 +208,8 @@ def main() -> None:
                         if modality == "motor":
                             motor_intero = insular(tensor_val)
                             filtered = axis.filter_intero(motor_intero)
-                            thalamus.submit("intero", filtered)
+                            # Negate feedback to dampen repeated thoughts
+                            thalamus.submit("intero", -filtered)
                         else:
                             thalamus.submit(modality, tensor_val)
 
@@ -232,7 +233,8 @@ def main() -> None:
             )
             motor_intero = insular(out_aug)
             filtered = axis.filter_intero(motor_intero)
-            thalamus.submit("intero", filtered)
+            # Negate feedback to dampen repeated thoughts
+            thalamus.submit("intero", -filtered)
             trainer.step(
                 [
                     dmn.fusion,
@@ -260,7 +262,8 @@ def main() -> None:
                 hippocampus.add_episode({"motor": teach_emb.squeeze(0).detach().cpu().numpy()})
                 motor_intero = insular(teach_emb)
                 filtered = axis.filter_intero(motor_intero)
-                thalamus.submit("intero", filtered)
+                # Negate feedback to dampen repeated thoughts
+                thalamus.submit("intero", -filtered)
                 trainer.step(
                     [
                         dmn.fusion,
