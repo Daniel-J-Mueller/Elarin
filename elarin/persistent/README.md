@@ -15,3 +15,9 @@ Additional files:
 - ``globus_pallidus.pt`` – braking inhibition weights
 - ``nucleus_accumbens.pt`` – reward drive predictor
 - ``substantia_nigra.pt`` – movement initiation booster
+- ``amygdala_emotion.pt`` –
+- ``basal_ganglia_gating.pt`` –
+- ``corpus_callosum_bridge.pt`` –
+- ``insular_mapping.pt`` –
+- ``motor_insula.pt`` –
+- ``wernicke_adapter.pt`` –
