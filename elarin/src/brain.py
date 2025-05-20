@@ -1,4 +1,4 @@
-"""Main integration loop linking sensors, DMN and motor cortex."""
+"""Main integration loop linking sensors, cortical hubs and motor cortex."""
 
 from PIL import Image
 import torch
@@ -25,10 +25,11 @@ from .corpus_callosum import CorpusCallosum
 from .amygdala import Amygdala
 from .frontal_lobe import FrontalLobe
 from .prefrontal_cortex import PrefrontalCortex
-from .default_mode_network import DefaultModeNetwork
+from .inferior_parietal_lobule import InferiorParietalLobule
+from .superior_parietal_lobule import SuperiorParietalLobule
+from .precuneus import Precuneus
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
-from .insular_cortex import InsularCortex
 from .hippocampus import Hippocampus, DistributedHippocampus
 from .subiculum import Subiculum
 from .dentate_gyrus import DentateGyrus
@@ -92,21 +93,34 @@ def main() -> None:
         device=devices["language_areas"],
         token_table_path=f"{persist_dir}/token_embeddings.npy",
     )
-    like_emb = wernicke.encode(["I like that"]).mean(dim=1).to(devices["dmn"])
-    dislike_emb = (
-        wernicke.encode(["I don't like that"]).mean(dim=1).to(devices["dmn"])
-    )
 
-    dmn = DefaultModeNetwork(
-        audio_dim=896,
-        intero_dim=768,
-        hidden_dim=2048,
+    valence_path = persist_dir / "valence.npy"
+    if valence_path.exists():
+        table = np.load(valence_path, allow_pickle=True).item()
+        like_emb = (
+            torch.tensor(table.get("positive"), device=devices["dmn"])
+            .mean(dim=0, keepdim=True)
+        )
+        dislike_emb = (
+            torch.tensor(table.get("negative"), device=devices["dmn"])
+            .mean(dim=0, keepdim=True)
+        )
+    else:
+        like_emb = torch.zeros(1, 768, device=devices["dmn"])
+        dislike_emb = torch.zeros(1, 768, device=devices["dmn"])
+
+    sup_parietal = SuperiorParietalLobule(
+        device=devices["dmn"], persist_path=f"{persist_dir}/superior_parietal_lobule.pt"
+    )
+    inf_parietal = InferiorParietalLobule(
+        device=devices["dmn"], persist_path=f"{persist_dir}/inferior_parietal_lobule.pt"
+    )
+    precuneus = Precuneus(
+        input_dim=128 + 896 + 768,
         output_dim=768,
-        num_layers=4,
-    ).to(devices["dmn"])
-    # Weight sensory inputs slightly higher than internal interoceptive signals
-    # Increase audio and vision emphasis to encourage responsiveness
-    dmn.set_modality_weights(vision=1.4, audio=1.4, intero=1.0)
+        device=devices["dmn"],
+        persist_path=f"{persist_dir}/precuneus.pt",
+    )
     hip_dims = {
         "vision": 128,
         "audio": 896,
@@ -217,7 +231,7 @@ def main() -> None:
     try:
         while True:
             step += 1
-            # Adjust DMN modality weights based on hormone levels
+            # Adjust sensory modality weights based on hormone levels
             vis_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
             aud_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
             intero_w = (
@@ -226,7 +240,7 @@ def main() -> None:
                 - 0.2 * axis.dopamine
                 - 0.1 * axis.acetylcholine
             )
-            dmn.set_modality_weights(vis_w, aud_w, intero_w)
+            # apply sensory weighting using neurotransmitter levels
 
             # simple speculative step removed due to obsolete SemanticFlow
             if not debug_no_video:
@@ -318,7 +332,13 @@ def main() -> None:
                 audio = audio * weights["audio"]
                 intero = intero * weights["intero"]
 
-            context = dmn(vision, audio, intero)
+            vision_proc = sup_parietal.reconcile(vision)
+            vision_proc = inf_parietal.integrate(vision_proc)
+            vision_proc = vision_proc * vis_w
+            audio_proc = audio * aud_w
+            intero_proc = intero * intero_w
+            combined = torch.cat([vision_proc, audio_proc, intero_proc], dim=-1)
+            context = precuneus.reflect(combined)
             context = corpus.transfer(context)
 
             context_np = context.squeeze(0).detach().cpu().numpy()
@@ -442,7 +462,15 @@ def main() -> None:
             thalamus.submit("intero", -filtered)
             trainer.step(
                 [
-                    dmn.fusion,
+                    precuneus.net,
+                    precuneus.short_lora,
+                    precuneus.long_lora,
+                    sup_parietal.net,
+                    sup_parietal.short_lora,
+                    sup_parietal.long_lora,
+                    inf_parietal.net,
+                    inf_parietal.short_lora,
+                    inf_parietal.long_lora,
                     augmenter,
                     cerebellum.short_lora,
                     cerebellum.long_lora,
@@ -532,7 +560,15 @@ def main() -> None:
                 thalamus.submit("intero", -filtered)
                 trainer.step(
                     [
-                        dmn.fusion,
+                        precuneus.net,
+                        precuneus.short_lora,
+                        precuneus.long_lora,
+                        sup_parietal.net,
+                        sup_parietal.short_lora,
+                        sup_parietal.long_lora,
+                        inf_parietal.net,
+                        inf_parietal.short_lora,
+                        inf_parietal.long_lora,
                         motor.area.model.transformer,
                         augmenter,
                         cerebellum.short_lora,
@@ -601,6 +637,16 @@ def main() -> None:
         corpus.save()
         basal.save()
         cerebellum.save()
+        precuneus.save()
+        sup_parietal.save()
+        inf_parietal.save()
+        pituitary.save()
+        entorhinal.save()
+        parietal.save()
+        cingulate.save()
+        midbrain.save()
+        pons.save()
+        medulla.save()
 
 
 if __name__ == "__main__":
