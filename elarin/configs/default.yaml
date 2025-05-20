@@ -30,7 +30,7 @@ settings:
   audio_duration: 0.25
   # Set true to disable video capture and processing
   debug_no_video: false
-  log_to_file: false
+  log_to_file: true
   # Capacity of episodic memory buffer
   hippocampus_capacity: 1000000
   hippocampus_recall_threshold: 0.2
