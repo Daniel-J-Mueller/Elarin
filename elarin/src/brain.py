@@ -31,8 +31,8 @@ from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
 from .semantic_flow import SemanticFlow
-from .utils.config import load_config
-from .utils.logger import get_logger
+from .utils.config import load_config, BASE_DIR
+from .utils.logger import get_logger, enable_file_logging
 from .viewer import Viewer
 from .utils.camera import Camera
 from .utils.audio_buffer import AudioBuffer
@@ -43,6 +43,7 @@ def main() -> None:
     devices = cfg["devices"]
     models = cfg["models"]
     persist_dir = Path(cfg.get("persistent_dir", "persistent"))
+    log_dir = Path(cfg.get("log_dir", "logs"))
     settings = cfg.get("settings", {})
     loop_interval = float(settings.get("loop_interval", 0.05))
     audio_duration = float(settings.get("audio_duration", 1.0))
@@ -52,11 +53,16 @@ def main() -> None:
     hippocampus_shards = int(settings.get("hippocampus_shards", 1))
     salience_thresh = float(settings.get("hippocampus_salience_threshold", 0.0))
     motor_candidates = int(settings.get("motor_candidates", 1))
+    log_to_file = bool(settings.get("log_to_file", False))
 
     if not persist_dir.is_absolute():
-        from .utils.config import BASE_DIR
-
         persist_dir = BASE_DIR / persist_dir
+
+    if not log_dir.is_absolute():
+        log_dir = BASE_DIR / log_dir
+
+    if log_to_file:
+        enable_file_logging(str(log_dir))
 
     logger = get_logger("brain")
     bus = MessageBus()
@@ -173,9 +179,11 @@ def main() -> None:
     )
 
     last_token = None
+    step = 0
 
     try:
         while True:
+            step += 1
             # Adjust DMN modality weights based on hormone levels
             vis_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
             aud_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
@@ -402,6 +410,13 @@ def main() -> None:
             )
 
             hippocampus.decay()
+
+            if log_to_file and step % 50 == 0:
+                logger.info(
+                    "stn_baseline=%.3f hippo_mem=%.2fGB",
+                    stn.baseline,
+                    hippocampus.memory_usage_gb(),
+                )
 
             if viewer:
                 viewer.update(frame_rgb, out_text, audio_level)

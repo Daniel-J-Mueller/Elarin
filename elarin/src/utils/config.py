@@ -39,4 +39,7 @@ def load_config(path: str) -> Dict[str, Any]:
     if "persistent_dir" in cfg:
         cfg["persistent_dir"] = resolve(cfg["persistent_dir"])
 
+    if "log_dir" in cfg:
+        cfg["log_dir"] = resolve(cfg["log_dir"])
+
     return cfg
