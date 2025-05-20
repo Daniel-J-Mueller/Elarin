@@ -1,3 +1,5 @@
+"""Adapter representing a semantic mapping step in Wernicke's area."""
+
 import torch
 from torch import nn
 from pathlib import Path
@@ -5,7 +7,7 @@ from pathlib import Path
 from ..utils.sentinel import SentinelLinear
 
 
-class LanguageAugmenter(nn.Module):
+class WernickeAdapter(nn.Module):
     """Simple adapter that transforms token embeddings.
 
     The augmenter learns to map embeddings from the language areas

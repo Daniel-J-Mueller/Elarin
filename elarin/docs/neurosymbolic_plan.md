@@ -1,6 +1,6 @@
 # Revised Neurosymbolic Plan
 
-This document outlines how we will evolve Elarin from the current single-model approach into a set of cooperating region models. Each region will roughly match the size and function of its biological counterpart as described in `human_brain_components_reference.txt`. Persistent checkpoints currently located in `elarin/persistent/` (e.g. `motor_cortex_generator.pt`, `motor_insula.pt`, `language_augmenter.pt`) are treated as temporary bootstrap weights.
+This document outlines how we will evolve Elarin from the current single-model approach into a set of cooperating region models. Each region will roughly match the size and function of its biological counterpart as described in `human_brain_components_reference.txt`. Persistent checkpoints currently located in `elarin/persistent/` (e.g. `motor_cortex_generator.pt`, `motor_insula.pt`, `wernicke_adapter.pt`) are treated as temporary bootstrap weights.
 
 ## 1. Core Principles
 
