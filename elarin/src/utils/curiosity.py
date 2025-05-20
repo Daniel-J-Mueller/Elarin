@@ -33,7 +33,7 @@ class CuriosityTracker:
         if self.repeat_streak < 2:
             return emb
 
-        strength = min(1.0, self.repeat_streak / 10.0)
+        strength = min(1.0, self.repeat_streak / 2.0)
         freq = torch.fft.rfft(emb, dim=-1)
         noise = (torch.rand_like(freq.real) - 0.5) * 2.0 * strength
         freq = freq * (1.0 + noise + 0j)
