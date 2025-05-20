@@ -28,14 +28,15 @@ This layout keeps sensory preprocessing together, while higher order decision an
 
 ## 3. Bootstrapping Workflow
 
-1. Initialise each region with the smallest suitable model in `elarin/models/`.
-2. Load LoRA adapters from `elarin/persistent/` when available.
-3. During runtime the `trainer` service applies Hebbian updates continuously.
-4. If a weight value equals the sentinel (e.g. `-1e9`) skip the connection. When activity reinforces a path, replace the sentinel with a small positive weight.
-5. Each region stores its own checkpoint in ``elarin/persistent/``.
-6. Adapter weights are written with msgpack for faster reloads.
-7. Sensors publish raw embeddings over ``MessageBus`` topics which cortex modules
-   subscribe to for asynchronous processing.
+The initial scaffolding is now functional:
+1. Regions load seed weights from ``elarin/models`` and resume any adapters from
+   ``elarin/persistent``.
+2. The trainer performs live Hebbian updates while applying sentinel-aware down-
+   regulation.
+3. Checkpoints are written using msgpack and reloaded on startup.
+4. Sensors stream embeddings over the ``MessageBus`` for asynchronous
+   processing.
+5. Bus throughput metrics are recorded to tune the replay buffer.
 
 ## 4. Data Flow Updates
 
@@ -54,6 +55,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 - Fine-tune the subthalamic nucleus inhibition threshold using reinforcement signals.
 - Investigate distributed hippocampal training strategies.
-- Measure MessageBus throughput and extend it to hippocampal replay streams.
+- Integrate the ``TemporalLobe`` speculation buffer into the DMN context.
+- Leverage ``SemanticFlow`` to model cause/effect token transitions.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
