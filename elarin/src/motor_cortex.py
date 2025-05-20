@@ -48,6 +48,9 @@ class MotorCortex:
             self.long_lora.load_state_dict(state.get("long_lora", {}), strict=False)
         self.persist_path = persist_path
         self.num_candidates = max(1, int(num_candidates))
+        self.history: list[int] = []
+        self.history_size = 50
+        self.repetition_penalty = 1.2
         
     def save(self, path: str | None = None) -> None:
         """Save adapter parameters for later reloading."""
@@ -122,6 +125,9 @@ class MotorCortex:
             context_vec = context_vec.squeeze(0)
             sims = torch.nn.functional.cosine_similarity(table, context_vec, dim=1)
             sims = sims / max(temp, 1e-5)
+            if self.history:
+                hist_ids = torch.tensor(self.history, dtype=torch.long, device=sims.device)
+                sims[hist_ids] *= 1.0 / self.repetition_penalty
             topk = torch.topk(sims, k=n)
             ids = topk.indices.tolist()
             texts = [self.wernicke.tokenizer.decode([i], skip_special_tokens=True) for i in ids]
@@ -131,7 +137,13 @@ class MotorCortex:
         else:
             # Fall back to sampling via Broca's area when no table is available
             candidates = list(
-                self.area.decode(hidden.to(self.device), temperature=temp, num_samples=n)
+                self.area.decode(
+                    hidden.to(self.device),
+                    temperature=temp,
+                    num_samples=n,
+                    history=self.history,
+                    repetition_penalty=self.repetition_penalty,
+                )
             )
             texts = [t for t, _, _ in candidates]
             ids = [tid for _, _, tid in candidates]
@@ -143,6 +155,13 @@ class MotorCortex:
             sims = torch.nn.functional.cosine_similarity(enc_means, context_vec.squeeze(0), dim=1)
             best_idx = int(torch.argmax(sims).item())
             best_text = texts[best_idx]
+
+        # update history of produced tokens
+        if ids:
+            tok_id = ids[best_idx]
+            self.history.append(tok_id)
+            if len(self.history) > self.history_size:
+                self.history.pop(0)
 
         self.logger.info(best_text)
         chosen_emb = enc[best_idx : best_idx + 1]
