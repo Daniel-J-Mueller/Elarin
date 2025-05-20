@@ -26,7 +26,7 @@ from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .insular_cortex import InsularCortex
-from .hippocampus import Hippocampus
+from .hippocampus import Hippocampus, DistributedHippocampus
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
@@ -49,6 +49,8 @@ def main() -> None:
     debug_no_video = bool(settings.get("debug_no_video", False))
     hippocampus_capacity = int(settings.get("hippocampus_capacity", 1000))
     recall_threshold = float(settings.get("hippocampus_recall_threshold", 0.0))
+    hippocampus_shards = int(settings.get("hippocampus_shards", 1))
+    salience_thresh = float(settings.get("hippocampus_salience_threshold", 0.0))
     motor_candidates = int(settings.get("motor_candidates", 1))
 
     if not persist_dir.is_absolute():
@@ -84,19 +86,36 @@ def main() -> None:
     # Weight sensory inputs slightly higher than internal interoceptive signals
     # Increase audio and vision emphasis to encourage responsiveness
     dmn.set_modality_weights(vision=1.4, audio=1.4, intero=1.0)
-    hippocampus = Hippocampus(
-        dims={
-            "vision": 128,
-            "audio": 896,
-            "intero": 768,
-            "context": 768,
-            "motor": 768,
-            "speech": 768,
-        },
-        capacity=hippocampus_capacity,
-        recall_threshold=recall_threshold,
-        persist_path=f"{persist_dir}/hippocampus.npz",
-    )
+    hip_dims = {
+        "vision": 128,
+        "audio": 896,
+        "intero": 768,
+        "context": 768,
+        "motor": 768,
+        "speech": 768,
+    }
+    if hippocampus_shards > 1:
+        shard_paths = [
+            f"{persist_dir}/hippocampus_shard_{i}.npz"
+            for i in range(hippocampus_shards)
+        ]
+        hippocampus = DistributedHippocampus(
+            hip_dims,
+            num_shards=hippocampus_shards,
+            shard_paths=shard_paths,
+            capacity=hippocampus_capacity,
+            recall_threshold=recall_threshold,
+            salience_threshold=salience_thresh,
+            compressed=True,
+        )
+    else:
+        hippocampus = Hippocampus(
+            dims=hip_dims,
+            capacity=hippocampus_capacity,
+            recall_threshold=recall_threshold,
+            persist_path=f"{persist_dir}/hippocampus.npz",
+            salience_threshold=salience_thresh,
+        )
     amygdala = Amygdala(device=devices["dmn"])
     pfc = PrefrontalCortex(device=devices["dmn"])
     corpus = CorpusCallosum(embed_dim=768, device=devices["dmn"])
@@ -351,9 +370,11 @@ def main() -> None:
                     "speech": user_emb.squeeze(0).detach().cpu().numpy(),
                 },
                 valence=valence,
+                salience=novelty,
             )
             axis.update_valence(valence)
             stn.reinforce(valence)
+            axis.adjust_inhibition(stn.baseline)
             motor_intero = insular(out_aug)
             filtered = axis.filter_intero(motor_intero)
             # Negate feedback to dampen repeated thoughts
@@ -401,9 +422,11 @@ def main() -> None:
                         "speech": teach_emb.squeeze(0).detach().cpu().numpy(),
                     },
                     valence=teach_val,
+                    salience=1.0,
                 )
                 axis.update_valence(teach_val)
                 stn.reinforce(teach_val)
+                axis.adjust_inhibition(stn.baseline)
                 motor_intero = insular(teach_emb)
                 filtered = axis.filter_intero(motor_intero)
                 # Negate feedback to dampen repeated thoughts

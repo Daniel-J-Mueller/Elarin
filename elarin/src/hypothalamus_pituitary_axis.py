@@ -63,3 +63,10 @@ class HypothalamusPituitaryAxis:
         self.serotonin = 0.95 * self.serotonin + neg
         self.dopamine = max(0.0, min(1.0, self.dopamine))
         self.serotonin = max(0.0, min(1.0, self.serotonin))
+
+    def adjust_inhibition(self, baseline: float) -> None:
+        """Modify hormone levels based on subthalamic nucleus baseline."""
+        self.norepinephrine = 0.98 * self.norepinephrine + 0.02 * baseline
+        self.acetylcholine = 0.98 * self.acetylcholine + 0.01 * baseline
+        self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
+        self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
