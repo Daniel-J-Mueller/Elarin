@@ -26,17 +26,14 @@ We divide the system into smaller modules. For each area we define the approxima
 
 This layout keeps sensory preprocessing together, while higher order decision and motor areas share GPUs to reduce latency between them. The run scripts already enforce these assignments using ``CUDA_VISIBLE_DEVICES``.
 
-## 3. Bootstrapping Workflow
+## 3. Bootstrapping Status
 
-The initial scaffolding is now functional:
-1. Regions load seed weights from ``elarin/models`` and resume any adapters from
-   ``elarin/persistent``.
-2. The trainer performs live Hebbian updates while applying sentinel-aware down-
-   regulation.
-3. Checkpoints are written using msgpack and reloaded on startup.
-4. Sensors stream embeddings over the ``MessageBus`` for asynchronous
-   processing.
-5. Bus throughput metrics are recorded to tune the replay buffer.
+The groundwork described in the previous revision has been implemented. Regions
+load seed weights from ``elarin/models`` and resume adapters from
+``elarin/persistent``. Checkpoints are persisted via msgpack and sensors publish
+embeddings through the ``MessageBus``. Trainer updates now run continually with
+sentinel-aware down-regulation and bus throughput metrics are available for
+tuning the replay buffer.
 
 ## 4. Data Flow Updates
 
@@ -53,8 +50,13 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 ## 5. Next Steps
 
-- Investigate distributed hippocampal training strategies.
-- Use ``SemanticFlow`` predictions to seed the ``TemporalLobe`` speculation buffer.
-- Evaluate the reinforcement schedule for the subthalamic nucleus threshold.
+- Investigate distributed hippocampal training strategies and tune recall
+  thresholds.  The hippocampus integrates sensory context via the entorhinal
+  cortex to form memories as noted in the reference text【F:human_brain_components_reference.txt†L108-L113】.
+- Evaluate the reinforcement schedule for the subthalamic nucleus threshold to
+  better mimic its role in delaying impulsive actions【F:human_brain_components_reference.txt†L246-L250】.
+- Expand the prefrontal gating mechanism so that executive signals can filter
+  irrelevant sensations before actions are produced, echoing the description of
+  the prefrontal cortex【F:human_brain_components_reference.txt†L53-L56】.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

@@ -155,6 +155,8 @@ def main() -> None:
         samplerate=16000, channels=1, buffer_seconds=audio_duration * 2
     )
 
+    last_token = None
+
     try:
         while True:
             # Adjust DMN modality weights based on hormone levels
@@ -167,6 +169,12 @@ def main() -> None:
                 - 0.1 * axis.acetylcholine
             )
             dmn.set_modality_weights(vis_w, aud_w, intero_w)
+
+            if last_token is not None:
+                pred_idx = sem_flow.sample_next(last_token, temperature=1.0 + axis.norepinephrine)
+                if pred_idx is not None:
+                    pred_tok = wernicke.tokenizer.decode([pred_idx])
+                    temporal.add_speculation([pred_tok])
             if not debug_no_video:
                 frame_bgr = cam.read()
                 if frame_bgr is None:
@@ -301,7 +309,10 @@ def main() -> None:
                 temporal.add_speculation(cand_texts)
                 temporal.consume(out_text)
                 if out_text:
-                    sem_flow.observe(wernicke.tokenizer.encode(out_text))
+                    tokens = wernicke.tokenizer.encode(out_text)
+                    sem_flow.observe(tokens)
+                    if tokens:
+                        last_token = tokens[-1]
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
@@ -375,7 +386,10 @@ def main() -> None:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
                 teach_val = amygdala.evaluate(teach_emb)
-                sem_flow.observe(wernicke.tokenizer.encode(taught))
+                tokens = wernicke.tokenizer.encode(taught)
+                sem_flow.observe(tokens)
+                if tokens:
+                    last_token = tokens[-1]
                 hippocampus.add_episode(
                     {
                         "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
