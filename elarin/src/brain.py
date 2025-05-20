@@ -10,9 +10,11 @@ from pathlib import Path
 from .utils.message_bus import MessageBus
 from .sensors.cochlea import Cochlea
 from .auditory_cortex import AuditoryCortex
+from .primary_auditory_cortex import PrimaryAuditoryCortex
 
 from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
+from .primary_visual_cortex import PrimaryVisualCortex
 from .language_areas.wernickes_area import WernickesArea
 from .language_areas.augmenter import LanguageAugmenter
 from .insular_cortex import InsularCortex
@@ -21,6 +23,7 @@ from .subthalamic_nucleus import SubthalamicNucleus
 from .cerebellum import Cerebellum
 from .corpus_callosum import CorpusCallosum
 from .amygdala import Amygdala
+from .frontal_lobe import FrontalLobe
 from .prefrontal_cortex import PrefrontalCortex
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
@@ -30,6 +33,13 @@ from .hippocampus import Hippocampus, DistributedHippocampus
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
+from .parietal_lobe import ParietalLobe
+from .entorhinal_cortex import EntorhinalCortex
+from .cingulate_cortex import CingulateCortex
+from .midbrain import Midbrain
+from .pons import Pons
+from .medulla_oblongata import MedullaOblongata
+from .pituitary_gland import PituitaryGland
 from .utils.config import load_config, BASE_DIR
 from .utils.logger import get_logger, enable_file_logging
 from .viewer import Viewer
@@ -69,8 +79,10 @@ def main() -> None:
     bus = MessageBus()
 
     retina = Retina(models["clip"], device=devices["retina"])
+    primary_vis = PrimaryVisualCortex(device=devices["occipital_lobe"])
     occipital = OccipitalLobe(device=devices["occipital_lobe"])
     cochlea = Cochlea(models["whisper"], device=devices["cochlea"])
+    primary_aud = PrimaryAuditoryCortex(device=devices["auditory_cortex"])
     auditory = AuditoryCortex(device=devices["auditory_cortex"])
 
     wernicke = WernickesArea(
@@ -103,7 +115,7 @@ def main() -> None:
     }
     if hippocampus_shards > 1:
         shard_paths = [
-            f"{persist_dir}/hippocampus_shard_{i}.npz"
+            f"{persist_dir}/hippocampus_memory_shard_{i}.npz"
             for i in range(hippocampus_shards)
         ]
         hippocampus = DistributedHippocampus(
@@ -120,21 +132,29 @@ def main() -> None:
             dims=hip_dims,
             capacity=hippocampus_capacity,
             recall_threshold=recall_threshold,
-            persist_path=f"{persist_dir}/hippocampus.npz",
+            persist_path=f"{persist_dir}/hippocampus_memory.npz",
             salience_threshold=salience_thresh,
         )
     amygdala = Amygdala(
-        device=devices["dmn"], persist_path=f"{persist_dir}/amygdala.pt"
+        device=devices["dmn"], persist_path=f"{persist_dir}/amygdala_emotion.pt"
     )
-    pfc = PrefrontalCortex(
-        device=devices["dmn"], persist_path=f"{persist_dir}/prefrontal.pt"
+    frontal = FrontalLobe(
+        device=devices["dmn"], persist_path=f"{persist_dir}/frontal_lobe.pt"
     )
+    pfc = frontal.prefrontal
     corpus = CorpusCallosum(
         embed_dim=768,
         device=devices["dmn"],
-        persist_path=f"{persist_dir}/corpus.pt",
+        persist_path=f"{persist_dir}/corpus_callosum_bridge.pt",
     )
     axis = HypothalamusPituitaryAxis()
+    pituitary = PituitaryGland(device=devices["dmn"], persist_path=f"{persist_dir}/pituitary_gland.pt")
+    entorhinal = EntorhinalCortex(device=devices["dmn"], persist_path=f"{persist_dir}/entorhinal_cortex.pt")
+    parietal = ParietalLobe(device=devices["occipital_lobe"], persist_path=f"{persist_dir}/parietal_lobe.pt")
+    cingulate = CingulateCortex(device=devices["dmn"], persist_path=f"{persist_dir}/cingulate_cortex.pt")
+    midbrain = Midbrain(device=devices["dmn"], persist_path=f"{persist_dir}/midbrain.pt")
+    pons = Pons(device=devices["dmn"], persist_path=f"{persist_dir}/pons.pt")
+    medulla = MedullaOblongata(device=devices["dmn"], persist_path=f"{persist_dir}/medulla_oblongata.pt")
     stn = SubthalamicNucleus(device=devices["dmn"])
     basal = BasalGanglia(
         input_dim=768,
@@ -142,31 +162,31 @@ def main() -> None:
         axis=axis,
         prefrontal=pfc,
         stn=stn,
-        persist_path=f"{persist_dir}/basal_ganglia.pt",
+        persist_path=f"{persist_dir}/basal_ganglia_gating.pt",
     )
     insular = InsularCortex(
         device=devices["dmn"],
-        persist_path=f"{persist_dir}/insular.pt",
+        persist_path=f"{persist_dir}/insular_mapping.pt",
     )
     temporal = TemporalLobe()
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
-        persist_path=f"{persist_dir}/angular_gyrus.pt",
+        persist_path=f"{persist_dir}/language_augmenter.pt",
     )
     insula = InsularCortex(
         device=devices["motor_cortex"],
-        persist_path=f"{persist_dir}/insula.pt",
+        persist_path=f"{persist_dir}/motor_insula.pt",
     )
     cerebellum = Cerebellum(
         device=devices.get("cerebellum", devices["motor_cortex"]),
-        persist_path=f"{persist_dir}/cerebellum.pt",
+        persist_path=f"{persist_dir}/cerebellum_correction.pt",
     )
     motor = MotorCortex(
         models["gpt2"],
         wernicke,
         device=devices["motor_cortex"],
         axis=axis,
-        persist_path=f"{persist_dir}/motor.pt",
+        persist_path=f"{persist_dir}/motor_cortex_generator.pt",
         num_candidates=motor_candidates,
     )
 
@@ -215,7 +235,9 @@ def main() -> None:
                     img = Image.fromarray(frame_rgb).resize((224, 224))
 
                 vision_emb = retina.encode([img]).to(devices["occipital_lobe"])
-                vision_feat = occipital.process(vision_emb)
+                prim_vis = primary_vis.extract(vision_emb)
+                vision_feat = occipital.process(prim_vis)
+                vision_feat = parietal.attend(vision_feat)
                 thalamus.submit("vision", vision_feat)
             else:
                 frame_rgb = np.zeros((224, 224, 3), dtype=np.uint8)
@@ -235,7 +257,8 @@ def main() -> None:
                 )
                 spoken = cochlea.transcribe(audio_tensor)
                 emb = cochlea.encode([audio_tensor])
-                audio_feat = auditory.process(emb)
+                prim_aud = primary_aud.extract(emb)
+                audio_feat = auditory.process(prim_aud)
                 if audio_feat.dim() == 3:
                     audio_feat = audio_feat.mean(dim=1)
             if spoken:
@@ -305,6 +328,10 @@ def main() -> None:
                 novelty = float(1.0 - sim.item())
 
             axis.step(novelty, 0.0)
+            axis.norepinephrine = max(
+                0.0,
+                min(1.0, axis.norepinephrine + pons.boost(torch.tensor([[novelty]])))
+            )
             like_sim = torch.nn.functional.cosine_similarity(
                 context.view(-1), like_emb.view(-1), dim=0
             ).item()
@@ -383,19 +410,22 @@ def main() -> None:
 
             insula_emb = insula(out_aug)
             valence = amygdala.evaluate(context)
+            pain_mod = cingulate.modulate(torch.tensor([[valence]]))
+            axis.dopamine = max(0.0, min(1.0, axis.dopamine + midbrain.adjust(context)))
+            ctx_store = entorhinal.funnel(context)
             hippocampus.add_episode(
                 {
                     "vision": vision.squeeze(0).detach().cpu().numpy(),
                     "audio": audio.squeeze(0).detach().cpu().numpy(),
                     "intero": intero.squeeze(0).detach().cpu().numpy(),
-                    "context": context.squeeze(0).detach().cpu().numpy(),
+                    "context": ctx_store.squeeze(0).detach().cpu().numpy(),
                     "motor": insula_emb.squeeze(0).detach().cpu().numpy(),
                     "speech": user_emb.squeeze(0).detach().cpu().numpy(),
                 },
                 valence=valence,
                 salience=novelty,
             )
-            axis.update_valence(valence)
+            axis.update_valence(valence + pain_mod)
             stn.reinforce(valence)
             axis.adjust_inhibition(stn.baseline)
             axis.memory_pressure(hippocampus.memory_usage_gb())
@@ -447,15 +477,17 @@ def main() -> None:
                 teach_val = amygdala.evaluate(teach_emb)
                 tokens = wernicke.tokenizer.encode(taught)
                 # training data now collected directly without transition table
+                ctx_store = entorhinal.funnel(teach_emb)
                 hippocampus.add_episode(
                     {
                         "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
                         "speech": teach_emb.squeeze(0).detach().cpu().numpy(),
+                        "context": ctx_store.squeeze(0).detach().cpu().numpy(),
                     },
                     valence=teach_val,
                     salience=1.0,
                 )
-                axis.update_valence(teach_val)
+                axis.update_valence(teach_val + pain_mod)
                 stn.reinforce(teach_val)
                 axis.adjust_inhibition(stn.baseline)
                 axis.memory_pressure(hippocampus.memory_usage_gb())

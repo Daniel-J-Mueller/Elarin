@@ -20,12 +20,14 @@ def wipe(persist_dir: str | Path | None = None) -> None:
 
     removed = False
     for filename in (
-        "hippocampus.npy",
-        "hippocampus.npz",
-        "motor.pt",
-        "angular_gyrus.pt",
-        "insular.pt",
-        "insula.pt",
+        "hippocampus_memory.npy",
+        "hippocampus_memory.npz",
+        "motor_cortex_generator.pt",
+        "language_augmenter.pt",
+        "insular_mapping.pt",
+        "motor_insula.pt",
+        "frontal_lobe.pt",
+        "amygdala_emotion.pt",
     ):
         target = path / filename
         if target.exists():
