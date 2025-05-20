@@ -157,6 +157,8 @@ def main() -> None:
                 audio_tensor = torch.from_numpy(audio_np).float().to(cochlea.device)
                 emb = cochlea.encode([audio_tensor])
                 audio_feat = auditory.process(emb)
+                if audio_feat.dim() == 3:
+                    audio_feat = audio_feat.mean(dim=1)
             if spoken:
                 flow.observe(wernicke.tokenizer.encode(spoken))
                 text_emb = wernicke.encode([spoken]).mean(dim=1)
