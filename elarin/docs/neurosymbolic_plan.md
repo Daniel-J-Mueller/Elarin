@@ -69,5 +69,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   varied.【F:human_brain_components_reference.txt†L219-L245】【F:human_brain_components_reference.txt†L232-L239】【F:human_brain_components_reference.txt†L246-L250】
 - Refactor the obsolete Default Mode Network into interconnected prefrontal, posterior cingulate and angular gyrus modules.
 - Introduce a curiosity-driven intrinsic motivation module so unexplored tokens receive a small bonus during selection.
+- Add a ``neurogenesis`` bootstrapping step that seeds any zero-weight region with
+  Kaiming-initialized parameters and tracks which modules have been born.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

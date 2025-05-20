@@ -38,3 +38,4 @@ settings:
   hippocampus_salience_threshold: 0.0
   # Number of speculative motor tokens to generate per step (debug mode)
   motor_candidates: 1
+  neurogenesis: true
