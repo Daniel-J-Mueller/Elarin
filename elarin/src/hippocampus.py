@@ -230,6 +230,10 @@ class DistributedHippocampus:
         for shard in self.shards:
             shard.decay(rate)
 
+    def memory_usage_gb(self) -> float:
+        """Return combined memory usage of all shards."""
+        return float(sum(shard.memory_usage_gb() for shard in self.shards))
+
     def clear(self) -> None:
         for shard in self.shards:
             shard.clear()

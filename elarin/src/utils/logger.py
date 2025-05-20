@@ -1,5 +1,20 @@
 import logging
+from pathlib import Path
 from typing import Optional
+
+
+_file_handler: Optional[logging.Handler] = None
+
+
+def enable_file_logging(log_dir: str) -> None:
+    """Save logs to ``log_dir``/debug.log in addition to STDOUT."""
+    global _file_handler
+    Path(log_dir).mkdir(parents=True, exist_ok=True)
+    log_path = Path(log_dir) / "debug.log"
+    handler = logging.FileHandler(log_path)
+    fmt = "[%(asctime)s] %(name)s %(levelname)s: %(message)s"
+    handler.setFormatter(logging.Formatter(fmt))
+    _file_handler = handler
 
 
 def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
@@ -14,5 +29,7 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         fmt = "[%(asctime)s] %(name)s %(levelname)s: %(message)s"
         handler.setFormatter(logging.Formatter(fmt))
         logger.addHandler(handler)
+        if _file_handler:
+            logger.addHandler(_file_handler)
         logger.setLevel(level)
     return logger
