@@ -15,9 +15,18 @@ Additional files:
 - ``globus_pallidus.pt`` – braking inhibition weights
 - ``nucleus_accumbens.pt`` – reward drive predictor
 - ``substantia_nigra.pt`` – movement initiation booster
-- ``amygdala_emotion.pt`` –
-- ``basal_ganglia_gating.pt`` –
-- ``corpus_callosum_bridge.pt`` –
-- ``insular_mapping.pt`` –
-- ``motor_insula.pt`` –
-- ``wernicke_adapter.pt`` –
+ - ``amygdala_emotion.pt`` – emotional valence predictor guiding learning
+ - ``basal_ganglia_gating.pt`` – overall Go/No-Go controller
+ - ``corpus_callosum_bridge.pt`` – inter-hemispheric transfer adapter
+ - ``insular_mapping.pt`` – maps motor output to internal state feedback
+ - ``motor_insula.pt`` – links motor actions back to interoception
+- ``wernicke_adapter.pt`` – semantic embedding augmenter
+- ``frontal_lobe.pt`` – collection of decision area adapters
+- ``pituitary_gland.pt`` – hormone relay weights
+- ``entorhinal_cortex.pt`` – cortical ↔ hippocampus mapper
+- ``parietal_lobe.pt`` – visual attention integration
+- ``cingulate_cortex.pt`` – pain and emotion modulation
+- ``midbrain.pt`` – dopamine adjustment network
+- ``pons.pt`` – salience-driven attention booster
+- ``medulla_oblongata.pt`` – baseline breathing rhythm
+- ``cerebellum_correction.pt`` – motor error feedback loops
