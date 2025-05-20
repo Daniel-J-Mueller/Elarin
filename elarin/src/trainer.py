@@ -66,7 +66,13 @@ class Trainer:
                 sentinel_mask = data == SENTINEL
                 data[~sentinel_mask] *= self.decay
 
-                if p.ndim == 1:
+                if p.ndim == 0:
+                    update = scaled_lr * act.to(data.device).mean()
+                    if sentinel_mask.item():
+                        data.copy_(UNTRAINED_INIT * update)
+                    else:
+                        data.add_(update)
+                elif p.ndim == 1:
                     length = min(data.shape[0], act.shape[0])
                     update = scaled_lr * act.to(data.device)[:length]
                     mask = sentinel_mask[:length]
@@ -122,7 +128,14 @@ class Trainer:
                 sentinel_mask = data == SENTINEL
                 data[~sentinel_mask] *= self.decay
 
-                if p.ndim == 1:
+                if p.ndim == 0:
+                    grad = error.mean().to(data.device)
+                    upd = self.lr * lr_scale * grad
+                    if sentinel_mask.item():
+                        data.copy_(UNTRAINED_INIT * upd)
+                    else:
+                        data.add_(upd)
+                elif p.ndim == 1:
                     length = min(data.shape[0], error.shape[1])
                     grad = error.mean(dim=0).to(data.device)[:length]
                     mask = sentinel_mask[:length]
