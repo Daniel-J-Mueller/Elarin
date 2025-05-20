@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
-from .insular_cortex import FatigueLoRA, LongTermLoRA
+from .utils.adapters import FatigueLoRA, LongTermLoRA
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .trainer import Trainer
 from .utils.logger import get_logger

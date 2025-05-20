@@ -5,6 +5,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from .utils.adapters import FatigueLoRA, LongTermLoRA
+
 
 class Amygdala(nn.Module):
     """Assign a valence score to context embeddings."""
@@ -15,13 +17,17 @@ class Amygdala(nn.Module):
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
-            nn.Tanh(),
         )
+        self.short_lora = FatigueLoRA(input_dim, 1, device=device)
+        self.long_lora = LongTermLoRA(input_dim, 1, device=device)
+        self.act = nn.Tanh()
         self.device = device
         self.to(device)
 
     @torch.no_grad()
     def evaluate(self, embedding: torch.Tensor) -> float:
         """Return valence in ``[-1, 1]`` for ``embedding``."""
-        val = self.net(embedding.to(self.device))
+        emb = embedding.to(self.device)
+        val = self.net(emb) + self.short_lora(emb) + self.long_lora(emb)
+        val = self.act(val)
         return float(val.squeeze())
