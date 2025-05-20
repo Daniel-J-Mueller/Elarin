@@ -101,6 +101,7 @@ def main() -> None:
 
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
+    prev_context = None
 
 
     cam = None
@@ -113,6 +114,11 @@ def main() -> None:
 
     try:
         while True:
+            # Adjust DMN modality weights based on hormone levels
+            vis_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
+            aud_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
+            intero_w = 1.0 + 0.5 * axis.serotonin - 0.2 * axis.dopamine - 0.1 * axis.acetylcholine
+            dmn.set_modality_weights(vis_w, aud_w, intero_w)
             if not debug_no_video:
                 frame_bgr = cam.read()
                 if frame_bgr is None:
@@ -176,6 +182,17 @@ def main() -> None:
                     intero = intero.mean(dim=1)
 
             context = dmn(vision, audio, intero)
+
+            if prev_context is None:
+                novelty = 1.0
+            else:
+                sim = torch.nn.functional.cosine_similarity(
+                    context.view(-1), prev_context.view(-1), dim=0
+                ).clamp(min=0.0)
+                novelty = float(1.0 - sim.item())
+
+            axis.step(novelty, 0.0)
+            prev_context = context.detach()
             recalled = hippocampus.query(
                 "context", context.squeeze(0).detach().cpu().numpy(), k=5
             )
