@@ -9,6 +9,10 @@ from typing import Iterable, Dict, List
 import numpy as np
 import torch
 
+# Resolve the base directory of the ``elarin`` package so relative paths work
+# regardless of the current working directory.
+BASE_DIR = Path(__file__).resolve().parents[2]
+
 # Allow running as a standalone tool or within the package
 try:
     from .logger import get_logger
@@ -42,7 +46,15 @@ def generate(model_dir: str | Path, output: Path, device: str = "cpu",
     phrases = phrases or DEFAULT_PHRASES
     logger = get_logger("valence_table")
 
-    wa = WernickesArea(str(model_dir), device=device)
+    model_path = Path(model_dir)
+    if not model_path.is_absolute():
+        model_path = BASE_DIR / model_path
+
+    output_path = output
+    if not output_path.is_absolute():
+        output_path = BASE_DIR / output_path
+
+    wa = WernickesArea(str(model_path), device=device)
 
     data: Dict[str, np.ndarray] = {}
     with torch.no_grad():
@@ -51,10 +63,10 @@ def generate(model_dir: str | Path, output: Path, device: str = "cpu",
             data[label] = emb.cpu().numpy().astype(np.float32)
             logger.info(f"encoded {len(texts)} {label} phrases")
 
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    np.save(output, data, allow_pickle=True)
-    logger.info(f"saved valence table to {output}")
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(output_path, data, allow_pickle=True)
+    logger.info(f"saved valence table to {output_path}")
 
 
 def main(argv: Iterable[str] | None = None) -> None:
