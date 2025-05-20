@@ -60,6 +60,6 @@ Outputs are routed through the thalamus or DMN so the overall flow remains consi
 - [x] **Stub corpus callosum** as a pass-through layer to allow future left/right specialisation.
 - [x] **Extend memory schema** in `Hippocampus` to tag episodes with emotional valence from the amygdala.
 - [x] **Add prefrontal cortex module** that modulates basal ganglia gating based on long-term goals.
-- [ ] Continue bootstrapping using LoRA adapters for rapid online learning of all new modules.
+- [x] Continue bootstrapping using LoRA adapters for rapid online learning of all new modules.
 
 This staged approach keeps the current processing order while gradually filling in the missing anatomical regions.

@@ -94,7 +94,7 @@ def main() -> None:
     )
     amygdala = Amygdala(device=devices["dmn"])
     pfc = PrefrontalCortex(device=devices["dmn"])
-    corpus = CorpusCallosum(device=devices["dmn"])
+    corpus = CorpusCallosum(embed_dim=768, device=devices["dmn"])
     axis = HypothalamusPituitaryAxis()
     basal = BasalGanglia(
         input_dim=768, device=devices["dmn"], axis=axis, prefrontal=pfc
@@ -307,6 +307,11 @@ def main() -> None:
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
+                trainer.align(
+                    [cerebellum.short_lora, cerebellum.long_lora],
+                    vision_feat.to(cerebellum.device),
+                    out_aug.to(cerebellum.device),
+                )
                 motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
             else:
                 out_text = ""
@@ -341,6 +346,14 @@ def main() -> None:
                 [
                     dmn.fusion,
                     augmenter,
+                    cerebellum.short_lora,
+                    cerebellum.long_lora,
+                    corpus.short_lora,
+                    corpus.long_lora,
+                    pfc.short_lora,
+                    pfc.long_lora,
+                    amygdala.short_lora,
+                    amygdala.long_lora,
                     motor.damp_lora,
                     motor.long_lora,
                     insular.short_lora,
@@ -376,20 +389,28 @@ def main() -> None:
                 # Negate feedback to dampen repeated thoughts
                 thalamus.submit("intero", -filtered)
                 trainer.step(
-                    [
-                        dmn.fusion,
-                        motor.area.model.transformer,
-                        augmenter,
-                        motor.damp_lora,
-                        motor.long_lora,
-                        insular.short_lora,
-                        insular.long_lora,
-                        insula.short_lora,
-                        insula.long_lora,
-                    ],
-                    teach_emb,
-                    lr_scale=2.0,
-                )
+                [
+                    dmn.fusion,
+                    motor.area.model.transformer,
+                    augmenter,
+                    cerebellum.short_lora,
+                    cerebellum.long_lora,
+                    corpus.short_lora,
+                    corpus.long_lora,
+                    pfc.short_lora,
+                    pfc.long_lora,
+                    amygdala.short_lora,
+                    amygdala.long_lora,
+                    motor.damp_lora,
+                    motor.long_lora,
+                    insular.short_lora,
+                    insular.long_lora,
+                    insula.short_lora,
+                    insula.long_lora,
+                ],
+                teach_emb,
+                lr_scale=2.0,
+            )
             time.sleep(loop_interval)
     except KeyboardInterrupt:
         logger.info("demo interrupted")
