@@ -34,9 +34,10 @@ Launch scripts now enforce these assignments using ``CUDA_VISIBLE_DEVICES`` so e
 2. Load LoRA adapters from `elarin/persistent/` when available.
 3. During runtime the `trainer` service applies Hebbian updates continuously.
 4. If a weight value equals the sentinel (e.g. `-1e9`) skip the connection. When activity reinforces a path, replace the sentinel with a small positive weight.
-5. Store per-region embeddings for phrases like “good” and “bad” in a table using ``utils/valence_table.py`` so later comparisons are trivial.
-6. The hippocampus maintains a FAISS index for quick nearest-neighbour recall of episodic embeddings.
-7. ``Trainer`` now recognises a sentinel weight value of ``-1e9``. Parameters initialised to this constant remain inert until activity overwrites them with a small weight.
+5. **Completed**: valence phrase embeddings are generated with ``utils/valence_table.py``.
+6. **Completed**: the hippocampus already employs a FAISS index for episodic recall.
+7. **Completed**: the trainer respects the sentinel weight ``-1e9`` so dormant paths remain inert.
+8. Sentinel-aware ``Linear`` layers now initialize weights to the sentinel constant so untrained connections contribute no signal.
 
 ## 4. Data Flow Updates
 
@@ -55,7 +56,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 - Split existing monolithic checkpoints into per-region files.
 - Connect all regions over a ZeroMQ message bus to match the relay behaviour of the corpus callosum and thalamus.
-- Expand sentinel-weight handling across all modules so untrained paths remain inactive until reinforced.
 - Investigate lightweight persistence formats to reduce adapter save/load times.
+- Broadcast context embeddings via the ZeroMQ ``MessageBus`` so external services can monitor activity.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

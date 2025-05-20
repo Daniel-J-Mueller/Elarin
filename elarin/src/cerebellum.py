@@ -4,6 +4,7 @@ import torch
 from torch import nn
 
 from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.sentinel import SentinelLinear
 
 
 class Cerebellum(nn.Module):
@@ -18,9 +19,9 @@ class Cerebellum(nn.Module):
     ) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(vision_dim + motor_dim, hidden_dim),
+            SentinelLinear(vision_dim + motor_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, motor_dim),
+            SentinelLinear(hidden_dim, motor_dim),
         )
         self.short_lora = FatigueLoRA(vision_dim + motor_dim, motor_dim, device=device)
         self.long_lora = LongTermLoRA(vision_dim + motor_dim, motor_dim, device=device)

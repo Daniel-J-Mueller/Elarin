@@ -5,6 +5,8 @@ from typing import Dict
 import torch
 from torch import nn
 
+from .utils.sentinel import SentinelLinear
+
 
 class DefaultModeNetwork(nn.Module):
     """Fuse sensory embeddings and produce routed context vectors."""
@@ -29,15 +31,15 @@ class DefaultModeNetwork(nn.Module):
 
         super().__init__()
         fusion_in = vision_dim + audio_dim + intero_dim
-        self.fusion = nn.Linear(fusion_in, hidden_dim)
+        self.fusion = SentinelLinear(fusion_in, hidden_dim)
         self.modality_scale = nn.Parameter(
             torch.tensor(modality_weights or (1.0, 1.0, 1.0), dtype=torch.float32)
         )
 
         layers = []
         for _ in range(num_layers - 1):
-            layers.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
-        layers.append(nn.Linear(hidden_dim, output_dim))
+            layers.extend([SentinelLinear(hidden_dim, hidden_dim), nn.ReLU()])
+        layers.append(SentinelLinear(hidden_dim, output_dim))
         self.router = nn.Sequential(*layers)
 
     def set_modality_weights(self, vision: float, audio: float, intero: float) -> None:
