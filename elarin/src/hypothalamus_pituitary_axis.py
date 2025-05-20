@@ -1,6 +1,6 @@
 """Simple neuro-modulator state machine."""
 
-
+import logging
 import torch
 
 
@@ -35,23 +35,42 @@ class HypothalamusPituitaryAxis:
 
         self.trend_rate = trend_rate
         self.novelty_avg = 0.0
+        self.novelty_var = 1e-6
         self.error_avg = 0.0
+        self.error_var = 1e-6
         self.baseline_avg = 0.0
 
     def step(self, novelty: float, error: float) -> None:
         """Update hormones using trend-adjusted novelty and error."""
 
         # Exponential moving averages capture long term trends
-        self.novelty_avg = (1 - self.trend_rate) * self.novelty_avg + self.trend_rate * novelty
-        self.error_avg = (1 - self.trend_rate) * self.error_avg + self.trend_rate * error
+        self.novelty_avg = (
+            1 - self.trend_rate
+        ) * self.novelty_avg + self.trend_rate * novelty
+        self.error_avg = (
+            1 - self.trend_rate
+        ) * self.error_avg + self.trend_rate * error
+        # Track variance to adapt update scale over time
+        self.novelty_var = (
+            1 - self.trend_rate
+        ) * self.novelty_var + self.trend_rate * (
+            novelty - self.novelty_avg
+        ) ** 2
+        self.error_var = (
+            1 - self.trend_rate
+        ) * self.error_var + self.trend_rate * (error - self.error_avg) ** 2
 
-        novelty_delta = novelty - self.novelty_avg
-        error_delta = error - self.error_avg
+        novelty_delta = (novelty - self.novelty_avg) / (
+            self.novelty_var**0.5 + 1e-6
+        )
+        error_delta = (error - self.error_avg) / (self.error_var**0.5 + 1e-6)
 
         self.dopamine = 0.9 * self.dopamine + novelty_delta
         self.norepinephrine = 0.9 * self.norepinephrine + error_delta
         self.serotonin = 0.995 * self.serotonin - 0.05 * novelty_delta
-        self.acetylcholine = 0.9 * self.acetylcholine + abs(novelty_delta - error_delta)
+        self.acetylcholine = 0.9 * self.acetylcholine + abs(
+            novelty_delta - error_delta
+        )
 
         self.dopamine = max(0.0, min(1.0, self.dopamine))
         self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
@@ -73,10 +92,12 @@ class HypothalamusPituitaryAxis:
             ).item()
             if sim > self.hab_threshold:
                 self.repeat_count += 1
-                self.habituation *= self.hab_decay ** self.repeat_count
+                self.habituation *= self.hab_decay**self.repeat_count
             else:
                 self.repeat_count = 0
-                self.habituation += (1.0 - self.habituation) * self.hab_recovery
+                self.habituation += (
+                    1.0 - self.habituation
+                ) * self.hab_recovery
 
         self.habituation = max(0.0, min(1.0, self.habituation))
         self.prev_intero = emb.detach().cpu()
@@ -100,11 +121,27 @@ class HypothalamusPituitaryAxis:
         【F:human_brain_components_reference.txt†L246-L250】.
         """
 
-        self.baseline_avg = (1 - self.trend_rate) * self.baseline_avg + self.trend_rate * baseline
+        self.baseline_avg = (
+            1 - self.trend_rate
+        ) * self.baseline_avg + self.trend_rate * baseline
         delta = baseline - self.baseline_avg
 
-        self.norepinephrine = 0.98 * self.norepinephrine + 0.02 * baseline + 0.05 * delta
-        self.acetylcholine = 0.98 * self.acetylcholine + 0.01 * baseline + 0.02 * delta
+        self.norepinephrine = (
+            0.98 * self.norepinephrine + 0.02 * baseline + 0.05 * delta
+        )
+        self.acetylcholine = (
+            0.98 * self.acetylcholine + 0.01 * baseline + 0.02 * delta
+        )
 
         self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
         self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
+
+    def log_levels(self, logger: "logging.Logger") -> None:
+        """Emit current hormone levels to ``logger``."""
+        logger.info(
+            "dopamine=%.3f norepinephrine=%.3f serotonin=%.3f acetylcholine=%.3f",
+            self.dopamine,
+            self.norepinephrine,
+            self.serotonin,
+            self.acetylcholine,
+        )

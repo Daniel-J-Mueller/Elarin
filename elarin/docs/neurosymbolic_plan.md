@@ -31,15 +31,15 @@ This layout keeps sensory preprocessing together, while higher order decision an
 Core modules now load seed weights from ``elarin/models`` and resume their
 adapters from ``elarin/persistent``. Sensors stream embeddings directly through
 the ``MessageBus`` and trainer updates apply sentinel-aware down-regulation at
-every step. The cochlea now outputs both log-mel features and token guesses in a
-single pass. The hippocampus filters episodes using a configurable
+every step. The cochlea outputs both log-mel features and token guesses in a
+single pass. The hippocampus filters episodes using configurable
 ``recall_threshold`` and ``salience_threshold`` so only novel memories pass the
 entorhinal gate【F:human_brain_components_reference.txt†L108-L113】. The baseline
 from the subthalamic nucleus modulates norepinephrine and acetylcholine to slow
 impulsive actions【F:human_brain_components_reference.txt†L246-L250】. Debug logs
-in ``logs/debug.log`` track this baseline along with hippocampal footprint for
-long term analysis. SemanticFlow has been removed; speculative tokens are kept
-only in the temporal lobe. Newly added persistence hooks now save LoRA weights
+now record this baseline together with hippocampal footprint and hormone levels
+for long term analysis. SemanticFlow has been removed; speculative tokens are
+kept only in the temporal lobe. Newly added persistence hooks save LoRA weights
 for the amygdala, prefrontal cortex, corpus callosum, basal ganglia and
 cerebellum so their neurosymbolic adaptations survive restarts.
 
@@ -60,6 +60,6 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 - Measure the impact of modality filtering and the unified Cochlea on reaction time, then refine the executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
 - Stress-test the ``DistributedHippocampus`` using the new memory usage reports and refine salience gating to prevent overload【F:human_brain_components_reference.txt†L108-L113】.
-- Evaluate the neuroadaptive hormone logic over multi-hour runs and tune the moving-average rates so dopamine and norepinephrine track trends without oscillation. Include baseline deviation logs to further study inhibitory coupling【F:human_brain_components_reference.txt†L246-L250】.
+- Continue tuning the neuroadaptive hormone logic so dopamine and norepinephrine track long term trends without oscillation. Hormone levels are now logged alongside the subthalamic baseline for later analysis【F:human_brain_components_reference.txt†L246-L250】.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

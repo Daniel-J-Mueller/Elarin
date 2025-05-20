@@ -50,7 +50,9 @@ def main() -> None:
     hippocampus_capacity = int(settings.get("hippocampus_capacity", 1000))
     recall_threshold = float(settings.get("hippocampus_recall_threshold", 0.0))
     hippocampus_shards = int(settings.get("hippocampus_shards", 1))
-    salience_thresh = float(settings.get("hippocampus_salience_threshold", 0.0))
+    salience_thresh = float(
+        settings.get("hippocampus_salience_threshold", 0.0)
+    )
     motor_candidates = int(settings.get("motor_candidates", 1))
     log_to_file = bool(settings.get("log_to_file", False))
 
@@ -76,7 +78,7 @@ def main() -> None:
         device=devices["language_areas"],
         token_table_path=f"{persist_dir}/token_embeddings.npy",
     )
-    like_emb = wernicke.encode(["I like that"]).mean(dim=1).to(devices["dmn"]) 
+    like_emb = wernicke.encode(["I like that"]).mean(dim=1).to(devices["dmn"])
     dislike_emb = (
         wernicke.encode(["I don't like that"]).mean(dim=1).to(devices["dmn"])
     )
@@ -128,7 +130,9 @@ def main() -> None:
         device=devices["dmn"], persist_path=f"{persist_dir}/prefrontal.pt"
     )
     corpus = CorpusCallosum(
-        embed_dim=768, device=devices["dmn"], persist_path=f"{persist_dir}/corpus.pt"
+        embed_dim=768,
+        device=devices["dmn"],
+        persist_path=f"{persist_dir}/corpus.pt",
     )
     axis = HypothalamusPituitaryAxis()
     stn = SubthalamicNucleus(device=devices["dmn"])
@@ -215,7 +219,9 @@ def main() -> None:
                 thalamus.submit("vision", vision_feat)
             else:
                 frame_rgb = np.zeros((224, 224, 3), dtype=np.uint8)
-                vision_feat = torch.zeros(1, 128, device=devices["occipital_lobe"])
+                vision_feat = torch.zeros(
+                    1, 128, device=devices["occipital_lobe"]
+                )
 
             audio_np = audio_buf.read(audio_duration)
             # Compute a simple RMS volume estimate and boost the gain for display
@@ -224,7 +230,9 @@ def main() -> None:
             audio_feat = torch.zeros(1, 128, device=devices["auditory_cortex"])
             # Ignore near-silent audio to avoid hallucinated transcripts
             if audio_level > 0.02:
-                audio_tensor = torch.from_numpy(audio_np).float().to(cochlea.device)
+                audio_tensor = (
+                    torch.from_numpy(audio_np).float().to(cochlea.device)
+                )
                 spoken = cochlea.transcribe(audio_tensor)
                 emb = cochlea.encode([audio_tensor])
                 audio_feat = auditory.process(emb)
@@ -320,7 +328,13 @@ def main() -> None:
                 if "valence" in recalled:
                     axis.update_valence(float(recalled["valence"]))
                 # Push other modalities back through the thalamus for replay
-                for modality in ("vision", "audio", "intero", "motor", "speech"):
+                for modality in (
+                    "vision",
+                    "audio",
+                    "intero",
+                    "motor",
+                    "speech",
+                ):
                     if modality in recalled:
                         tensor_val = torch.tensor(
                             recalled[modality], device=dmn_device
@@ -337,19 +351,25 @@ def main() -> None:
                                 thalamus.submit(modality, tensor_val)
 
             if basal.gate(context):
-                out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
+                out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(
+                    context
+                )
                 temporal.add_speculation(cand_texts)
                 temporal.consume(out_text)
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
-                vis_as_motor = motor.vision_to_text(vision_feat.to(motor.device))
+                vis_as_motor = motor.vision_to_text(
+                    vision_feat.to(motor.device)
+                )
                 trainer.align(
                     [cerebellum.short_lora, cerebellum.long_lora],
                     vis_as_motor.to(cerebellum.device),
                     out_aug.to(cerebellum.device),
                 )
-                motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
+                motor.learn_from_feedback(
+                    vision_feat, user_emb, cand_aug, trainer
+                )
             else:
                 out_text = ""
                 out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])
@@ -412,6 +432,7 @@ def main() -> None:
                     stn.baseline,
                     hippocampus.memory_usage_gb(),
                 )
+                axis.log_levels(logger)
 
             if viewer:
                 viewer.update(frame_rgb, out_text, audio_level)
@@ -440,28 +461,28 @@ def main() -> None:
                 # Negate feedback to dampen repeated thoughts
                 thalamus.submit("intero", -filtered)
                 trainer.step(
-                [
-                    dmn.fusion,
-                    motor.area.model.transformer,
-                    augmenter,
-                    cerebellum.short_lora,
-                    cerebellum.long_lora,
-                    corpus.short_lora,
-                    corpus.long_lora,
-                    pfc.short_lora,
-                    pfc.long_lora,
-                    amygdala.short_lora,
-                    amygdala.long_lora,
-                    motor.damp_lora,
-                    motor.long_lora,
-                    insular.short_lora,
-                    insular.long_lora,
-                    insula.short_lora,
-                    insula.long_lora,
-                ],
-                teach_emb,
-                lr_scale=2.0,
-            )
+                    [
+                        dmn.fusion,
+                        motor.area.model.transformer,
+                        augmenter,
+                        cerebellum.short_lora,
+                        cerebellum.long_lora,
+                        corpus.short_lora,
+                        corpus.long_lora,
+                        pfc.short_lora,
+                        pfc.long_lora,
+                        amygdala.short_lora,
+                        amygdala.long_lora,
+                        motor.damp_lora,
+                        motor.long_lora,
+                        insular.short_lora,
+                        insular.long_lora,
+                        insula.short_lora,
+                        insula.long_lora,
+                    ],
+                    teach_emb,
+                    lr_scale=2.0,
+                )
             time.sleep(loop_interval)
     except KeyboardInterrupt:
         logger.info("demo interrupted")
