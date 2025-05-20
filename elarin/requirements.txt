@@ -13,3 +13,4 @@ tqdm
 pyyaml
 faiss-cpu
 pyzmq
+msgpack
