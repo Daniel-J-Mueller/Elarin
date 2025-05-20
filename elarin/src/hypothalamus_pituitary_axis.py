@@ -37,8 +37,9 @@ class HypothalamusPituitaryAxis:
         """
 
         if self.prev_intero is not None:
+            prev = self.prev_intero.to(emb.device)
             sim = torch.nn.functional.cosine_similarity(
-                emb.view(-1), self.prev_intero.view(-1), dim=0
+                emb.view(-1), prev.view(-1), dim=0
             ).item()
             if sim > 0.95:
                 self.habituation *= self.hab_decay
