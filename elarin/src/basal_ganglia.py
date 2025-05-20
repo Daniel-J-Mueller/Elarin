@@ -5,9 +5,15 @@ from torch import nn
 
 
 class BasalGanglia(nn.Module):
-    """Simple Go/No-Go gating using a small MLP."""
+    """Go/No-Go gating modulated by dopaminergic state."""
 
-    def __init__(self, input_dim: int = 256, hidden_dim: int = 64, device: str = "cpu"):
+    def __init__(
+        self,
+        input_dim: int = 256,
+        hidden_dim: int = 64,
+        device: str = "cpu",
+        axis: "HypothalamusPituitaryAxis | None" = None,
+    ) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
@@ -16,9 +22,16 @@ class BasalGanglia(nn.Module):
             nn.Sigmoid(),
         )
         self.device = device
+        self.axis = axis
         self.to(device)
 
     @torch.no_grad()
     def gate(self, embedding: torch.Tensor) -> bool:
         prob = float(self.net(embedding.to(self.device)))
+        # Modulate gating probability using hormone levels if available
+        if self.axis is not None:
+            mod = (
+                1.0 + 0.5 * float(self.axis.dopamine) - 0.3 * float(self.axis.serotonin)
+            )
+            prob *= mod
         return prob > 0.5

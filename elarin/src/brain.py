@@ -15,6 +15,7 @@ from .occipital_lobe import OccipitalLobe
 from .language_areas.wernickes_area import WernickesArea
 from .language_areas.augmenter import LanguageAugmenter
 from .insular_cortex import InsularCortex
+from .basal_ganglia import BasalGanglia
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
@@ -45,6 +46,7 @@ def main() -> None:
 
     if not persist_dir.is_absolute():
         from .utils.config import BASE_DIR
+
         persist_dir = BASE_DIR / persist_dir
 
     logger = get_logger("brain")
@@ -83,12 +85,15 @@ def main() -> None:
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
+    basal = BasalGanglia(input_dim=768, device=devices["dmn"], axis=axis)
     insular = InsularCortex(
         device=devices["dmn"],
         persist_path=f"{persist_dir}/insular.pt",
     )
     temporal = TemporalLobe()
-    flow = SemanticFlow(len(wernicke.tokenizer), persist_path=f"{persist_dir}/semantic_flow.json")
+    flow = SemanticFlow(
+        len(wernicke.tokenizer), persist_path=f"{persist_dir}/semantic_flow.json"
+    )
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
@@ -113,21 +118,29 @@ def main() -> None:
     dmn_device = devices["dmn"]
     prev_context = None
 
-
     cam = None
     viewer = None
     if not debug_no_video:
         cam = Camera()
         viewer = Viewer(224, 224)
-    speech_recognizer = SpeechRecognizer(models["whisper"], device=devices.get("cochlea", "cpu"))
-    audio_buf = AudioBuffer(samplerate=16000, channels=1, buffer_seconds=audio_duration * 2)
+    speech_recognizer = SpeechRecognizer(
+        models["whisper"], device=devices.get("cochlea", "cpu")
+    )
+    audio_buf = AudioBuffer(
+        samplerate=16000, channels=1, buffer_seconds=audio_duration * 2
+    )
 
     try:
         while True:
             # Adjust DMN modality weights based on hormone levels
             vis_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
             aud_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
-            intero_w = 1.0 + 0.5 * axis.serotonin - 0.2 * axis.dopamine - 0.1 * axis.acetylcholine
+            intero_w = (
+                1.0
+                + 0.5 * axis.serotonin
+                - 0.2 * axis.dopamine
+                - 0.1 * axis.acetylcholine
+            )
             dmn.set_modality_weights(vis_w, aud_w, intero_w)
             if not debug_no_video:
                 frame_bgr = cam.read()
@@ -148,7 +161,7 @@ def main() -> None:
 
             audio_np = audio_buf.read(audio_duration)
             # Compute a simple RMS volume estimate and boost the gain for display
-            audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
+            audio_level = float(np.sqrt(np.mean(audio_np**2))) * 10.0
             spoken = ""
             audio_feat = torch.zeros(1, 128, device=devices["auditory_cortex"])
             # Ignore near-silent audio to avoid hallucinated transcripts
@@ -176,10 +189,13 @@ def main() -> None:
                 text_mix = 0.9 * user_emb + 0.1 * spec_emb
             else:
                 text_mix = spec_emb
-            combined_audio = torch.cat([
-                text_mix.to(audio_feat.device),
-                audio_feat,
-            ], dim=-1)
+            combined_audio = torch.cat(
+                [
+                    text_mix.to(audio_feat.device),
+                    audio_feat,
+                ],
+                dim=-1,
+            )
             thalamus.submit("audio", combined_audio)
 
             vision = thalamus.relay("vision")
@@ -219,13 +235,17 @@ def main() -> None:
             )
             if recalled:
                 if "context" in recalled:
-                    recall_ctx = torch.tensor(recalled["context"], device=dmn_device).unsqueeze(0)
+                    recall_ctx = torch.tensor(
+                        recalled["context"], device=dmn_device
+                    ).unsqueeze(0)
                     # Prioritize new sensory context over recalled thoughts
                     context = 0.7 * context + 0.3 * recall_ctx
                 # Push other modalities back through the thalamus for replay
                 for modality in ("vision", "audio", "intero", "motor", "speech"):
                     if modality in recalled:
-                        tensor_val = torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0)
+                        tensor_val = torch.tensor(
+                            recalled[modality], device=dmn_device
+                        ).unsqueeze(0)
                         if modality == "motor":
                             motor_intero = insular(tensor_val)
                             filtered = axis.filter_intero(motor_intero)
@@ -237,13 +257,17 @@ def main() -> None:
                             else:
                                 thalamus.submit(modality, tensor_val)
 
-            out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
-            flow.observe(wernicke.tokenizer.encode(out_text))
-            temporal.add_speculation(cand_texts)
-            temporal.consume(out_text)
-            cand_aug = augmenter(cand_embs)
-            out_aug = cand_aug[best_idx : best_idx + 1]
-            motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
+            if basal.gate(context):
+                out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
+                flow.observe(wernicke.tokenizer.encode(out_text))
+                temporal.add_speculation(cand_texts)
+                temporal.consume(out_text)
+                cand_aug = augmenter(cand_embs)
+                out_aug = cand_aug[best_idx : best_idx + 1]
+                motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
+            else:
+                out_text = ""
+                out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])
 
             insula_emb = insula(out_aug)
             hippocampus.add_episode(
@@ -285,10 +309,12 @@ def main() -> None:
                 flow.observe(wernicke.tokenizer.encode(taught))
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
-                hippocampus.add_episode({
-                    "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
-                    "speech": teach_emb.squeeze(0).detach().cpu().numpy(),
-                })
+                hippocampus.add_episode(
+                    {
+                        "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
+                        "speech": teach_emb.squeeze(0).detach().cpu().numpy(),
+                    }
+                )
                 motor_intero = insular(teach_emb)
                 filtered = axis.filter_intero(motor_intero)
                 # Negate feedback to dampen repeated thoughts
