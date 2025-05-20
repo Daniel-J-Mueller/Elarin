@@ -8,6 +8,7 @@ from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
 from .utils.adapters import FatigueLoRA, LongTermLoRA
 from .utils.sentinel import SentinelLinear
+from .utils.curiosity import CuriosityTracker
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .trainer import Trainer
 from .utils.logger import get_logger
@@ -41,12 +42,15 @@ class MotorCortex:
             self.area.model.config.n_embd,
             device=device,
         )
+        self.curiosity = CuriosityTracker()
         if persist_path and Path(persist_path).exists():
             state = torch.load(persist_path, map_location=device)
             self.area.model.load_state_dict(state.get("broca", {}), strict=False)
             self.vision_to_text.load_state_dict(state.get("vision_to_text", {}), strict=False)
             self.damp_lora.load_state_dict(state.get("damp_lora", {}), strict=False)
             self.long_lora.load_state_dict(state.get("long_lora", {}), strict=False)
+            if "curiosity" in state:
+                self.curiosity.load_state_dict(state["curiosity"])
         self.persist_path = persist_path
         self.num_candidates = max(1, int(num_candidates))
         self.history: list[int] = []
@@ -64,6 +68,7 @@ class MotorCortex:
                 "vision_to_text": self.vision_to_text.state_dict(),
                 "damp_lora": self.damp_lora.state_dict(),
                 "long_lora": self.long_lora.state_dict(),
+                "curiosity": self.curiosity.state_dict(),
             },
             target,
         )
@@ -129,6 +134,10 @@ class MotorCortex:
             if self.history:
                 hist_ids = torch.tensor(self.history, dtype=torch.long, device=sims.device)
                 sims[hist_ids] *= 1.0 / self.repetition_penalty
+            curiosity_bonus = torch.tensor([
+                self.curiosity.bonus(i) for i in range(table.size(0))
+            ], device=sims.device)
+            sims = sims * (1.0 + curiosity_bonus)
             topk = torch.topk(sims, k=n)
             ids = topk.indices.tolist()
             texts = [self.wernicke.tokenizer.decode([i], skip_special_tokens=True) for i in ids]
@@ -154,6 +163,10 @@ class MotorCortex:
             if context_vec.dim() == 3:
                 context_vec = context_vec.mean(dim=1)
             sims = torch.nn.functional.cosine_similarity(enc_means, context_vec.squeeze(0), dim=1)
+            curiosity_bonus = torch.tensor([
+                self.curiosity.bonus(tid) for tid in ids
+            ], device=sims.device)
+            sims = sims * (1.0 + curiosity_bonus)
             best_idx = int(torch.argmax(sims).item())
             best_text = texts[best_idx]
 
@@ -163,6 +176,7 @@ class MotorCortex:
             self.history.append(tok_id)
             if len(self.history) > self.history_size:
                 self.history.pop(0)
+            self.curiosity.update(tok_id)
 
         self.logger.info(best_text)
         chosen_emb = enc[best_idx : best_idx + 1]
