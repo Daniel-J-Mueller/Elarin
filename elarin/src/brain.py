@@ -16,7 +16,7 @@ from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
 from .primary_visual_cortex import PrimaryVisualCortex
 from .language_areas.wernickes_area import WernickesArea
-from .language_areas.augmenter import LanguageAugmenter
+from .language_areas.wernicke_adapter import WernickeAdapter
 from .insular_cortex import InsularCortex
 from .basal_ganglia import BasalGanglia
 from .subthalamic_nucleus import SubthalamicNucleus
@@ -169,9 +169,9 @@ def main() -> None:
         persist_path=f"{persist_dir}/insular_mapping.pt",
     )
     temporal = TemporalLobe()
-    augmenter = LanguageAugmenter(
+    augmenter = WernickeAdapter(
         device=devices["language_areas"],
-        persist_path=f"{persist_dir}/language_augmenter.pt",
+        persist_path=f"{persist_dir}/wernicke_adapter.pt",
     )
     insula = InsularCortex(
         device=devices["motor_cortex"],
