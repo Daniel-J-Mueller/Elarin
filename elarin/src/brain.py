@@ -30,7 +30,6 @@ from .hippocampus import Hippocampus, DistributedHippocampus
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
-from .semantic_flow import SemanticFlow
 from .utils.config import load_config, BASE_DIR
 from .utils.logger import get_logger, enable_file_logging
 from .viewer import Viewer
@@ -122,9 +121,15 @@ def main() -> None:
             persist_path=f"{persist_dir}/hippocampus.npz",
             salience_threshold=salience_thresh,
         )
-    amygdala = Amygdala(device=devices["dmn"])
-    pfc = PrefrontalCortex(device=devices["dmn"])
-    corpus = CorpusCallosum(embed_dim=768, device=devices["dmn"])
+    amygdala = Amygdala(
+        device=devices["dmn"], persist_path=f"{persist_dir}/amygdala.pt"
+    )
+    pfc = PrefrontalCortex(
+        device=devices["dmn"], persist_path=f"{persist_dir}/prefrontal.pt"
+    )
+    corpus = CorpusCallosum(
+        embed_dim=768, device=devices["dmn"], persist_path=f"{persist_dir}/corpus.pt"
+    )
     axis = HypothalamusPituitaryAxis()
     stn = SubthalamicNucleus(device=devices["dmn"])
     basal = BasalGanglia(
@@ -133,16 +138,13 @@ def main() -> None:
         axis=axis,
         prefrontal=pfc,
         stn=stn,
+        persist_path=f"{persist_dir}/basal_ganglia.pt",
     )
     insular = InsularCortex(
         device=devices["dmn"],
         persist_path=f"{persist_dir}/insular.pt",
     )
     temporal = TemporalLobe()
-    sem_flow = SemanticFlow(
-        wernicke.tokenizer.vocab_size,
-        persist_path=f"{persist_dir}/semantic_flow",
-    )
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
@@ -151,7 +153,10 @@ def main() -> None:
         device=devices["motor_cortex"],
         persist_path=f"{persist_dir}/insula.pt",
     )
-    cerebellum = Cerebellum(device=devices.get("cerebellum", devices["motor_cortex"]))
+    cerebellum = Cerebellum(
+        device=devices.get("cerebellum", devices["motor_cortex"]),
+        persist_path=f"{persist_dir}/cerebellum.pt",
+    )
     motor = MotorCortex(
         models["gpt2"],
         wernicke,
@@ -178,7 +183,6 @@ def main() -> None:
         samplerate=16000, channels=1, buffer_seconds=audio_duration * 2
     )
 
-    last_token = None
     step = 0
 
     try:
@@ -195,11 +199,7 @@ def main() -> None:
             )
             dmn.set_modality_weights(vis_w, aud_w, intero_w)
 
-            if last_token is not None:
-                pred_idx = sem_flow.sample_next(last_token, temperature=1.0 + axis.norepinephrine)
-                if pred_idx is not None:
-                    pred_tok = wernicke.tokenizer.decode([pred_idx])
-                    temporal.add_speculation([pred_tok])
+            # simple speculative step removed due to obsolete SemanticFlow
             if not debug_no_video:
                 frame_bgr = cam.read()
                 if frame_bgr is None:
@@ -340,11 +340,6 @@ def main() -> None:
                 out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
                 temporal.add_speculation(cand_texts)
                 temporal.consume(out_text)
-                if out_text:
-                    tokens = wernicke.tokenizer.encode(out_text)
-                    sem_flow.observe(tokens)
-                    if tokens:
-                        last_token = tokens[-1]
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
@@ -428,9 +423,7 @@ def main() -> None:
                 teach_emb = augmenter(teach_emb)
                 teach_val = amygdala.evaluate(teach_emb)
                 tokens = wernicke.tokenizer.encode(taught)
-                sem_flow.observe(tokens)
-                if tokens:
-                    last_token = tokens[-1]
+                # training data now collected directly without transition table
                 hippocampus.add_episode(
                     {
                         "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
@@ -483,7 +476,11 @@ def main() -> None:
         hippocampus.save()
         motor.save()
         augmenter.save()
-        sem_flow.save()
+        amygdala.save()
+        pfc.save()
+        corpus.save()
+        basal.save()
+        cerebellum.save()
 
 
 if __name__ == "__main__":

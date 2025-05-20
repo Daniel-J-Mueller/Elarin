@@ -2,6 +2,7 @@
 
 import torch
 from torch import nn
+from pathlib import Path
 
 from .utils.sentinel import SentinelLinear
 from .subthalamic_nucleus import SubthalamicNucleus
@@ -18,6 +19,7 @@ class BasalGanglia(nn.Module):
         axis: "HypothalamusPituitaryAxis | None" = None,
         prefrontal: "PrefrontalCortex | None" = None,
         stn: "SubthalamicNucleus | None" = None,
+        persist_path: str | None = None,
     ) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -31,6 +33,10 @@ class BasalGanglia(nn.Module):
         self.prefrontal = prefrontal
         self.stn = stn
         self.to(device)
+        self.persist_path = Path(persist_path) if persist_path else None
+        if self.persist_path and self.persist_path.exists():
+            state = torch.load(self.persist_path, map_location=device)
+            self.load_state_dict(state)
 
     @torch.no_grad()
     def gate(self, embedding: torch.Tensor) -> bool:
@@ -46,3 +52,9 @@ class BasalGanglia(nn.Module):
             prob *= 1.0 - float(self.stn.inhibition(embedding))
         prob = max(0.0, min(1.0, prob))
         return prob > 0.4
+
+    def save(self, path: str | None = None) -> None:
+        target = path or self.persist_path
+        if not target:
+            return
+        torch.save(self.state_dict(), target)
