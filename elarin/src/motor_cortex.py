@@ -121,6 +121,7 @@ class MotorCortex:
         # Apply adaptive dampening to the hidden state
         hidden = hidden.to(self.device)
         hidden = hidden + self.damp_lora(hidden) + self.long_lora(hidden)
+        hidden = self.curiosity.transform(hidden)
 
         if self.wernicke.token_table is not None:
             # Directly pick the most similar tokens from the precomputed table
