@@ -71,7 +71,7 @@ def main() -> None:
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
-    insular = InsularCortex().to(devices["dmn"])
+    insular = InsularCortex(device=devices["dmn"])
     temporal = TemporalLobe()
     flow = SemanticFlow(len(wernicke.tokenizer), persist_path=f"{persist_dir}/semantic_flow.json")
     augmenter = LanguageAugmenter(
