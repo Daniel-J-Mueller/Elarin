@@ -24,6 +24,7 @@ This file is the single source of truth for Elarin’s experiential architecture
 │   ├── basal_ganglia.py           # action gating & sequence chunker
 │   ├── reticular_activating_system.py  # arousal on/off control
 │   ├── hypothalamus_pituitary_axis.py  # neuro-modulator state machine
+│   ├── insular_cortex.py           # motor feedback → intero projection
 │   │
 │   ├── cortex_modules/
 │   │   ├── context_cortex.py      # temporal context encoder
@@ -136,7 +137,11 @@ This file is the single source of truth for Elarin’s experiential architecture
  - **Mechanism**: uses the back half of GPT-2 (6 layers) with LoRA adapters.
  - **Loopback**: each generated token is re-embedded and fed back as interoceptive/news sample.
 
-### 3.10 Trainer (trainer.py)
+### 3.10 Insular Cortex (insular_cortex.py)
+ - **Role**: transform motor embeddings into interoceptive space.
+ - **Mechanism**: linear projection + nonlinearity; prevents verbatim feedback loops.
+
+### 3.11 Trainer (trainer.py)
 - **Responsibilities**:  
   - **Hebbian updates** on adapter weights: reinforce high-activation chains immediately.  
   - **Down-regulation**: apply tiny decay to all adapters when unused.  
