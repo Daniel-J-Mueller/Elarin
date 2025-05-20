@@ -47,15 +47,23 @@ The script downloads the following models sequentially:
 
 3. **Precompute Token Embeddings**
 
-   This optional step generates a lookup table of GPT-2 token embeddings used by
-   the language areas. The output is written to
-   ``elarin/persistent/token_embeddings.npy``.
+   Generate a lookup table of GPT-2 token embeddings used by the language
+   areas. The output is written to ``elarin/persistent/token_embeddings.npy``.
 
    ```bash
    python elarin/src/utils/token_table.py
    ```
 
-4. **Run the Brain**
+4. **Generate Valence Embeddings**
+
+   Create a small table of positive and negative phrases used when assessing
+   emotional valence. The resulting file is ``elarin/persistent/valence.npy``.
+
+   ```bash
+   python elarin/src/utils/valence_table.py
+   ```
+
+5. **Run the Brain**
 
    Execute the main integration loop from the repository root (the
    directory containing the ``elarin`` folder). This command launches

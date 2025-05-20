@@ -407,22 +407,26 @@ def main() -> None:
                 out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(
                     context
                 )
-                temporal.add_speculation(cand_texts)
-                temporal.consume(out_text)
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
-                vis_as_motor = motor.vision_to_text(
-                    vision_feat.to(motor.device)
-                )
-                trainer.align(
-                    [cerebellum.short_lora, cerebellum.long_lora],
-                    vis_as_motor.to(cerebellum.device),
-                    out_aug.to(cerebellum.device),
-                )
-                motor.learn_from_feedback(
-                    vision_feat, user_emb, cand_aug, trainer
-                )
+                if basal.approve_action(out_aug):
+                    temporal.add_speculation(cand_texts)
+                    temporal.consume(out_text)
+                    vis_as_motor = motor.vision_to_text(
+                        vision_feat.to(motor.device)
+                    )
+                    trainer.align(
+                        [cerebellum.short_lora, cerebellum.long_lora],
+                        vis_as_motor.to(cerebellum.device),
+                        out_aug.to(cerebellum.device),
+                    )
+                    motor.learn_from_feedback(
+                        vision_feat, user_emb, cand_aug, trainer
+                    )
+                else:
+                    out_text = ""
+                    out_aug = torch.zeros(1, 768, device=devices["motor_cortex"]) 
             else:
                 out_text = ""
                 out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])
