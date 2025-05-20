@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from pathlib import Path
 
+from ..utils.sentinel import SentinelLinear
+
 
 class LanguageAugmenter(nn.Module):
     """Simple adapter that transforms token embeddings.
@@ -14,9 +16,9 @@ class LanguageAugmenter(nn.Module):
     def __init__(self, embed_dim: int = 768, hidden_dim: int = 1024, device: str = "cpu", persist_path: str | None = None) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
+            SentinelLinear(embed_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, embed_dim),
+            SentinelLinear(hidden_dim, embed_dim),
         )
         self.device = device
         self.to(device)

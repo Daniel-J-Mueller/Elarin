@@ -6,6 +6,8 @@ import time
 import cv2
 import numpy as np
 from pathlib import Path
+
+from .utils.message_bus import MessageBus
 from .sensors.speech_recognizer import SpeechRecognizer
 from .sensors.cochlea import Cochlea
 from .auditory_cortex import AuditoryCortex
@@ -53,6 +55,7 @@ def main() -> None:
         persist_dir = BASE_DIR / persist_dir
 
     logger = get_logger("brain")
+    bus = MessageBus()
 
     retina = Retina(models["clip"], device=devices["retina"])
     occipital = OccipitalLobe(device=devices["occipital_lobe"])
@@ -232,6 +235,7 @@ def main() -> None:
             context = corpus.transfer(context)
 
             context_np = context.squeeze(0).detach().cpu().numpy()
+            bus.publish("context", context_np.tobytes())
 
             if prev_context is None:
                 novelty = 1.0

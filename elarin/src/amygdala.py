@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.sentinel import SentinelLinear
 
 
 class Amygdala(nn.Module):
@@ -14,9 +15,9 @@ class Amygdala(nn.Module):
     def __init__(self, input_dim: int = 768, hidden_dim: int = 64, device: str = "cpu") -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+            SentinelLinear(input_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
+            SentinelLinear(hidden_dim, 1),
         )
         self.short_lora = FatigueLoRA(input_dim, 1, device=device)
         self.long_lora = LongTermLoRA(input_dim, 1, device=device)

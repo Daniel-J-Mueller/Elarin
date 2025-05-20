@@ -5,9 +5,7 @@ from typing import Iterable
 import torch
 from torch import nn
 
-
-SENTINEL = -1e9
-UNTRAINED_INIT = 1e-3
+from .utils.sentinel import SENTINEL, UNTRAINED_INIT
 
 
 class Trainer:

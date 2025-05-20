@@ -7,6 +7,7 @@ from torch import nn
 from pathlib import Path
 
 from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.sentinel import SentinelLinear
 
 
 class InsularCortex(nn.Module):
@@ -20,7 +21,7 @@ class InsularCortex(nn.Module):
         persist_path: str | None = None,
     ) -> None:
         super().__init__()
-        self.proj = nn.Linear(in_dim, intero_dim)
+        self.proj = SentinelLinear(in_dim, intero_dim)
         self.short_lora = FatigueLoRA(in_dim, intero_dim, device=device)
         self.long_lora = LongTermLoRA(in_dim, intero_dim, device=device)
         self.act = nn.Tanh()

@@ -3,6 +3,8 @@
 import torch
 from torch import nn
 
+from .utils.sentinel import SentinelLinear
+
 
 class BasalGanglia(nn.Module):
     """Go/No-Go gating modulated by dopaminergic state."""
@@ -17,9 +19,9 @@ class BasalGanglia(nn.Module):
     ) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+            SentinelLinear(input_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
+            SentinelLinear(hidden_dim, 1),
             nn.Sigmoid(),
         )
         self.device = device

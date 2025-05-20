@@ -7,6 +7,7 @@ from pathlib import Path
 from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
 from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.sentinel import SentinelLinear
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .trainer import Trainer
 from .utils.logger import get_logger
@@ -29,7 +30,7 @@ class MotorCortex:
         self.wernicke = wernicke
         self.axis = axis
         self.device = device
-        self.vision_to_text = nn.Linear(128, self.area.model.config.n_embd).to(device)
+        self.vision_to_text = SentinelLinear(128, self.area.model.config.n_embd).to(device)
         self.damp_lora = FatigueLoRA(
             self.area.model.config.n_embd,
             self.area.model.config.n_embd,
