@@ -44,7 +44,10 @@ class Cochlea:
         max_new_tokens: int = 16,
     ) -> str:
         """Return the transcription for ``audio`` using the decoder."""
-        inputs = self.processor(audio, sampling_rate=16000, return_tensors="pt")
+        # ``audio`` may reside on GPU; Whisper's feature extractor expects
+        # CPU numpy arrays. Convert before processing.
+        audio_np = audio.detach().cpu().numpy()
+        inputs = self.processor(audio_np, sampling_rate=16000, return_tensors="pt")
         input_features = inputs.input_features.to(self.device)
         attention_mask = getattr(inputs, "attention_mask", None)
         if attention_mask is not None:
