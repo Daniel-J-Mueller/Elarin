@@ -30,6 +30,8 @@ from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .insular_cortex import InsularCortex
 from .hippocampus import Hippocampus, DistributedHippocampus
+from .subiculum import Subiculum
+from .dentate_gyrus import DentateGyrus
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
@@ -135,6 +137,8 @@ def main() -> None:
             persist_path=f"{persist_dir}/hippocampus_memory.npz",
             salience_threshold=salience_thresh,
         )
+    dentate = DentateGyrus(device=devices["dmn"], persist_path=f"{persist_dir}/dentate_gyrus.pt")
+    subiculum = Subiculum(device=devices["dmn"], persist_path=f"{persist_dir}/subiculum.pt")
     amygdala = Amygdala(
         device=devices["dmn"], persist_path=f"{persist_dir}/amygdala_emotion.pt"
     )
@@ -163,6 +167,7 @@ def main() -> None:
         prefrontal=pfc,
         stn=stn,
         persist_path=f"{persist_dir}/basal_ganglia_gating.pt",
+        submodule_dir=str(persist_dir),
     )
     insular = InsularCortex(
         device=devices["dmn"],
@@ -350,6 +355,7 @@ def main() -> None:
                     recall_ctx = torch.tensor(
                         recalled["context"], device=dmn_device
                     ).unsqueeze(0)
+                    recall_ctx = subiculum(recall_ctx)
                     # Prioritize new sensory context over recalled thoughts
                     context = 0.7 * context + 0.3 * recall_ctx
                 if "valence" in recalled:
@@ -413,6 +419,7 @@ def main() -> None:
             pain_mod = cingulate.modulate(torch.tensor([[valence]]))
             axis.dopamine = max(0.0, min(1.0, axis.dopamine + midbrain.adjust(context)))
             ctx_store = entorhinal.funnel(context)
+            ctx_store = dentate.encode(ctx_store)
             hippocampus.add_episode(
                 {
                     "vision": vision.squeeze(0).detach().cpu().numpy(),
@@ -478,6 +485,7 @@ def main() -> None:
                 tokens = wernicke.tokenizer.encode(taught)
                 # training data now collected directly without transition table
                 ctx_store = entorhinal.funnel(teach_emb)
+                ctx_store = dentate.encode(ctx_store)
                 hippocampus.add_episode(
                     {
                         "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
@@ -529,6 +537,8 @@ def main() -> None:
         audio_buf.close()
         insular.save()
         insula.save()
+        dentate.save()
+        subiculum.save()
         hippocampus.save()
         motor.save()
         augmenter.save()
