@@ -6,7 +6,7 @@ import time
 import cv2
 import numpy as np
 from pathlib import Path
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
+from .sensors.speech_recognizer import SpeechRecognizer
 
 from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
@@ -66,6 +66,7 @@ def main() -> None:
             "intero": 768,
             "context": 768,
             "motor": 768,
+            "speech": 768,
         },
         capacity=hippocampus_capacity,
         persist_path=f"{persist_dir}/hippocampus.npy",
@@ -106,11 +107,7 @@ def main() -> None:
     if not debug_no_video:
         cam = Camera()
         viewer = Viewer(224, 224)
-    asr_processor = WhisperProcessor.from_pretrained(models["whisper"])
-    asr_model = WhisperForConditionalGeneration.from_pretrained(models["whisper"])
-    asr_device = devices.get("cochlea", "cpu")
-    asr_model.to(asr_device)
-    asr_model.eval()
+    speech_recognizer = SpeechRecognizer(models["whisper"], device=devices.get("cochlea", "cpu"))
     audio_buf = AudioBuffer(samplerate=16000, channels=1, buffer_seconds=audio_duration * 2)
 
     try:
@@ -135,28 +132,7 @@ def main() -> None:
             audio_np = audio_buf.read(audio_duration)
             # Compute a simple RMS volume estimate and boost the gain for display
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
-            inputs = asr_processor(audio_np, sampling_rate=16000, return_tensors="pt")
-            input_features = inputs.input_features.to(asr_device)
-            attention_mask = getattr(inputs, "attention_mask", None)
-            if attention_mask is not None:
-                attention_mask = attention_mask.to(asr_device)
-
-            prompt_ids = asr_processor.get_decoder_prompt_ids(
-                language="en", task="transcribe"
-            )
-
-            generation_args = {
-                "forced_decoder_ids": prompt_ids,
-                "max_new_tokens": 16,
-            }
-            if attention_mask is not None:
-                generation_args["attention_mask"] = attention_mask
-
-            predicted_ids = asr_model.generate(
-                input_features,
-                **generation_args,
-            )
-            spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
+            spoken = speech_recognizer.transcribe(audio_np)
             if spoken:
                 flow.observe(wernicke.tokenizer.encode(spoken))
                 text_emb = wernicke.encode([spoken]).mean(dim=1)
@@ -202,7 +178,7 @@ def main() -> None:
                     # Prioritize new sensory context over recalled thoughts
                     context = 0.7 * context + 0.3 * recall_ctx
                 # Push other modalities back through the thalamus for replay
-                for modality in ("vision", "audio", "intero", "motor"):
+                for modality in ("vision", "audio", "intero", "motor", "speech"):
                     if modality in recalled:
                         tensor_val = torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0)
                         if modality == "motor":
@@ -211,7 +187,10 @@ def main() -> None:
                             # Negate feedback to dampen repeated thoughts
                             thalamus.submit("intero", -filtered)
                         else:
-                            thalamus.submit(modality, tensor_val)
+                            if modality == "speech":
+                                thalamus.submit("audio", tensor_val)
+                            else:
+                                thalamus.submit(modality, tensor_val)
 
             out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
             flow.observe(wernicke.tokenizer.encode(out_text))
@@ -229,6 +208,7 @@ def main() -> None:
                     "intero": intero.squeeze(0).detach().cpu().numpy(),
                     "context": context.squeeze(0).detach().cpu().numpy(),
                     "motor": insula_emb.squeeze(0).detach().cpu().numpy(),
+                    "speech": user_emb.squeeze(0).detach().cpu().numpy(),
                 }
             )
             motor_intero = insular(out_aug)
@@ -260,7 +240,10 @@ def main() -> None:
                 flow.observe(wernicke.tokenizer.encode(taught))
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
-                hippocampus.add_episode({"motor": teach_emb.squeeze(0).detach().cpu().numpy()})
+                hippocampus.add_episode({
+                    "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
+                    "speech": teach_emb.squeeze(0).detach().cpu().numpy(),
+                })
                 motor_intero = insular(teach_emb)
                 filtered = axis.filter_intero(motor_intero)
                 # Negate feedback to dampen repeated thoughts
