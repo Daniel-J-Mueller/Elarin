@@ -15,8 +15,9 @@ class PrimaryAuditoryCortex(nn.Module):
 
     def __init__(
         self,
-        input_dim: int = 128,
-        output_dim: int = 128,
+        # Whisper encoder features are 768-dim so mirror that here
+        input_dim: int = 768,
+        output_dim: int = 768,
         device: str = "cpu",
         persist_path: str | None = None,
     ) -> None:
