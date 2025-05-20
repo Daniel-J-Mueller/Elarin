@@ -5,13 +5,21 @@ import torch
 
 
 class HypothalamusPituitaryAxis:
-    """Tracks four hormone levels and provides habituation filtering."""
+    """Tracks four hormone levels and provides habituation filtering.
+
+    A small moving-average baseline of novelty and prediction error is
+    maintained so hormone adjustments respond to trends rather than just the
+    current value.  This helps stabilise the system when novelty or error
+    fluctuates for long periods and mirrors how the limbic system modulates
+    behaviour based on context【F:human_brain_components_reference.txt†L108-L113】.
+    """
 
     def __init__(
         self,
         habituation_decay: float = 0.9,
         habituation_recovery: float = 0.02,
         habituation_threshold: float = 0.92,
+        trend_rate: float = 0.05,
     ) -> None:
         self.dopamine = 0.0
         self.norepinephrine = 0.0
@@ -25,11 +33,30 @@ class HypothalamusPituitaryAxis:
         self.repeat_count = 0
         self.prev_intero: torch.Tensor | None = None
 
+        self.trend_rate = trend_rate
+        self.novelty_avg = 0.0
+        self.error_avg = 0.0
+        self.baseline_avg = 0.0
+
     def step(self, novelty: float, error: float) -> None:
-        self.dopamine = 0.9 * self.dopamine + novelty
-        self.norepinephrine = 0.9 * self.norepinephrine + error
-        self.serotonin *= 0.99
-        self.acetylcholine = 0.9 * self.acetylcholine + abs(novelty - error)
+        """Update hormones using trend-adjusted novelty and error."""
+
+        # Exponential moving averages capture long term trends
+        self.novelty_avg = (1 - self.trend_rate) * self.novelty_avg + self.trend_rate * novelty
+        self.error_avg = (1 - self.trend_rate) * self.error_avg + self.trend_rate * error
+
+        novelty_delta = novelty - self.novelty_avg
+        error_delta = error - self.error_avg
+
+        self.dopamine = 0.9 * self.dopamine + novelty_delta
+        self.norepinephrine = 0.9 * self.norepinephrine + error_delta
+        self.serotonin = 0.995 * self.serotonin - 0.05 * novelty_delta
+        self.acetylcholine = 0.9 * self.acetylcholine + abs(novelty_delta - error_delta)
+
+        self.dopamine = max(0.0, min(1.0, self.dopamine))
+        self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
+        self.serotonin = max(0.0, min(1.0, self.serotonin))
+        self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
 
     def filter_intero(self, emb: torch.Tensor) -> torch.Tensor:
         """Attenuate repetitive motor embeddings.
@@ -65,8 +92,19 @@ class HypothalamusPituitaryAxis:
         self.serotonin = max(0.0, min(1.0, self.serotonin))
 
     def adjust_inhibition(self, baseline: float) -> None:
-        """Modify hormone levels based on subthalamic nucleus baseline."""
-        self.norepinephrine = 0.98 * self.norepinephrine + 0.02 * baseline
-        self.acetylcholine = 0.98 * self.acetylcholine + 0.01 * baseline
+        """Modify hormone levels based on subthalamic nucleus baseline.
+
+        The baseline itself is filtered with the same ``trend_rate`` to produce
+        a running mean.  Hormone levels react to deviations from that mean which
+        approximates how inhibitory control adapts over time
+        【F:human_brain_components_reference.txt†L246-L250】.
+        """
+
+        self.baseline_avg = (1 - self.trend_rate) * self.baseline_avg + self.trend_rate * baseline
+        delta = baseline - self.baseline_avg
+
+        self.norepinephrine = 0.98 * self.norepinephrine + 0.02 * baseline + 0.05 * delta
+        self.acetylcholine = 0.98 * self.acetylcholine + 0.01 * baseline + 0.02 * delta
+
         self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
         self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
