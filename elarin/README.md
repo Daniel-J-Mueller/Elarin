@@ -7,7 +7,7 @@ infancy; many modules currently contain only scaffolding.
 
 The high level layout mirrors how sensory information flows through the human
 brain. Sensors capture raw data which is encoded, routed through early sensory
-processors, fused in the Default Mode Network (DMN) and finally used to produce
+processors, integrated across associative regions, and finally used to produce
 motor output. A trainer process performs online adapter updates to keep the
 system plastic.
 
