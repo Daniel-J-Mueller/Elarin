@@ -132,7 +132,10 @@ def main() -> None:
             audio_np = audio_buf.read(audio_duration)
             # Compute a simple RMS volume estimate and boost the gain for display
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
-            spoken = speech_recognizer.transcribe(audio_np)
+            spoken = ""
+            # Ignore near-silent audio to avoid hallucinated transcripts
+            if audio_level > 0.05:
+                spoken = speech_recognizer.transcribe(audio_np)
             if spoken:
                 flow.observe(wernicke.tokenizer.encode(spoken))
                 text_emb = wernicke.encode([spoken]).mean(dim=1)
