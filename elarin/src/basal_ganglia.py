@@ -71,7 +71,7 @@ class BasalGanglia(nn.Module):
         if self.stn is not None:
             prob *= 1.0 - float(self.stn.inhibition(embedding))
         prob = max(0.0, min(1.0, prob))
-        return prob > 0.4
+        return prob > 0.25
 
     def save(self, path: str | None = None) -> None:
         target = path or self.persist_path

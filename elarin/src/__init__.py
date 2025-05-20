@@ -8,7 +8,7 @@ from .subthalamic_nucleus import SubthalamicNucleus
 
 
 def main() -> None:
-    """Entry point for the demo script."""
+    """Entry point for running the integrated brain."""
     from .brain import main as run
 
     run()
