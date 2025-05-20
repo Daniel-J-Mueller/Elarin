@@ -37,7 +37,7 @@ def wipe(persist_dir: str | Path | None = None) -> None:
 
     # remove any additional files or directories except README
     for extra in list(path.iterdir()):
-        if extra.name == "README.md" or extra.name == "token_embeddings.npy":
+        if extra.name == "README.md" or extra.name == "token_embeddings.npy" or extra.name == "valence.npy":
             continue
         if extra.is_file():
             extra.unlink()
