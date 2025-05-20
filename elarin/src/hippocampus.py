@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 from pathlib import Path
 
 import numpy as np
+import psutil
 
 try:
     import faiss  # type: ignore
@@ -25,6 +26,8 @@ class Hippocampus:
         use_faiss: bool = True,
         compressed: bool = True,
         recall_threshold: float = 0.0,
+        *,
+        salience_threshold: float = 0.0,
     ) -> None:
         self.dims = dims
         self.capacity = capacity
@@ -36,6 +39,8 @@ class Hippocampus:
         self.index: Dict[str, "faiss.Index"] = {}
         self.mapping: Dict[str, List[int]] = {}
         self.recall_threshold = recall_threshold
+        self.salience_threshold = salience_threshold
+        self.process = psutil.Process()
 
         if self.persist_path and self.persist_path.exists():
             try:
@@ -49,6 +54,11 @@ class Hippocampus:
 
         if self.use_faiss:
             self._rebuild_index()
+
+    def memory_usage_gb(self) -> float:
+        """Return approximate process memory usage in gigabytes."""
+        mem = self.process.memory_info().rss
+        return mem / 1e9
 
     def _rebuild_index(self) -> None:
         """Recreate FAISS indices from current memory."""
@@ -69,8 +79,18 @@ class Hippocampus:
                 self.index[modality].add(vec.reshape(1, -1).astype("float32"))
                 self.mapping[modality].append(i)
 
-    def add_episode(self, episode: Dict[str, np.ndarray], valence: float = 0.0) -> None:
+    def add_episode(
+        self,
+        episode: Dict[str, np.ndarray],
+        valence: float = 0.0,
+        *,
+        salience: float = 1.0,
+    ) -> None:
         """Store a set of embeddings for different modalities with a valence tag."""
+
+        if salience < self.salience_threshold:
+            return
+
         if len(self.memory) >= self.capacity:
             self.memory.pop(0)
         # Ensure all arrays are float32 for consistency
@@ -173,3 +193,47 @@ class Hippocampus:
             np.savez_compressed(self.persist_path, memory=arr)
         else:
             np.save(self.persist_path, arr, allow_pickle=True)
+
+
+class DistributedHippocampus:
+    """Wrap multiple :class:`Hippocampus` shards for larger capacity."""
+
+    def __init__(
+        self,
+        dims: Dict[str, int],
+        num_shards: int = 1,
+        *,
+        shard_paths: Optional[List[str]] = None,
+        **kwargs,
+    ) -> None:
+        if shard_paths is None:
+            shard_paths = [None] * num_shards
+        if len(shard_paths) < num_shards:
+            shard_paths = shard_paths + [None] * (num_shards - len(shard_paths))
+        self.shards = [
+            Hippocampus(dims, persist_path=path, **kwargs) for path in shard_paths
+        ]
+
+    def add_episode(self, episode: Dict[str, np.ndarray], valence: float = 0.0, *, salience: float = 1.0) -> None:
+        for shard in self.shards:
+            shard.add_episode(episode, valence, salience=salience)
+
+    def query(self, modality: str, embedding: np.ndarray, k: int = 5) -> Dict[str, np.ndarray]:
+        merged: Dict[str, List[np.ndarray]] = {}
+        for shard in self.shards:
+            res = shard.query(modality, embedding, k)
+            for key, val in res.items():
+                merged.setdefault(key, []).append(val)
+        return {k: np.mean(v, axis=0) if isinstance(v[0], np.ndarray) else float(np.mean(v)) for k, v in merged.items()}
+
+    def decay(self, rate: float = 0.99) -> None:
+        for shard in self.shards:
+            shard.decay(rate)
+
+    def clear(self) -> None:
+        for shard in self.shards:
+            shard.clear()
+
+    def save(self) -> None:
+        for shard in self.shards:
+            shard.save()

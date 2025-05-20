@@ -12,3 +12,4 @@ faiss-cpu
 pyzmq
 msgpack
 msgpack-numpy
+psutil
