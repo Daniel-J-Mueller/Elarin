@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
+from .insular_cortex import FatigueLoRA
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .trainer import Trainer
 from .utils.logger import get_logger
@@ -29,10 +30,16 @@ class MotorCortex:
         self.axis = axis
         self.device = device
         self.vision_to_text = nn.Linear(128, self.area.model.config.n_embd).to(device)
+        self.damp_lora = FatigueLoRA(
+            self.area.model.config.n_embd,
+            self.area.model.config.n_embd,
+            device=device,
+        )
         if persist_path and Path(persist_path).exists():
             state = torch.load(persist_path, map_location=device)
             self.area.model.load_state_dict(state.get("broca", {}), strict=False)
             self.vision_to_text.load_state_dict(state.get("vision_to_text", {}), strict=False)
+            self.damp_lora.load_state_dict(state.get("damp_lora", {}), strict=False)
         self.persist_path = persist_path
         self.num_candidates = max(1, int(num_candidates))
         
@@ -45,6 +52,7 @@ class MotorCortex:
             {
                 "broca": self.area.model.state_dict(),
                 "vision_to_text": self.vision_to_text.state_dict(),
+                "damp_lora": self.damp_lora.state_dict(),
             },
             target,
         )
@@ -93,6 +101,9 @@ class MotorCortex:
                 temp = 1.0
 
         n = num_candidates if num_candidates is not None else self.num_candidates
+
+        # Apply adaptive dampening to the hidden state
+        hidden = hidden + self.damp_lora(hidden)
 
         if self.wernicke.token_table is not None:
             # Directly pick the most similar tokens from the precomputed table
@@ -159,5 +170,10 @@ class MotorCortex:
                 trainer.align(
                     [self.area.model.transformer],
                     audio_emb.to(self.device),
+                    tok,
+                )
+                trainer.align(
+                    [self.damp_lora],
+                    torch.zeros_like(tok),
                     tok,
                 )

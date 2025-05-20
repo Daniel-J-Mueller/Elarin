@@ -71,14 +71,20 @@ def main() -> None:
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
-    insular = InsularCortex(device=devices["dmn"])
+    insular = InsularCortex(
+        device=devices["dmn"],
+        persist_path=f"{persist_dir}/insular.pt",
+    )
     temporal = TemporalLobe()
     flow = SemanticFlow(len(wernicke.tokenizer), persist_path=f"{persist_dir}/semantic_flow.json")
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
     )
-    insula = InsularCortex(device=devices["motor_cortex"])
+    insula = InsularCortex(
+        device=devices["motor_cortex"],
+        persist_path=f"{persist_dir}/insula.pt",
+    )
     motor = MotorCortex(
         models["gpt2"],
         wernicke,
@@ -225,7 +231,18 @@ def main() -> None:
             motor_intero = insular(out_aug)
             filtered = axis.filter_intero(motor_intero)
             thalamus.submit("intero", filtered)
-            trainer.step([dmn.fusion, augmenter], context)
+            trainer.step(
+                [
+                    dmn.fusion,
+                    augmenter,
+                    motor.damp_lora,
+                    insular.short_lora,
+                    insular.long_lora,
+                    insula.short_lora,
+                    insula.long_lora,
+                ],
+                context,
+            )
             # Align DMN output with the embeddings of the speculative tokens so
             # future contexts better predict likely next words. ``Trainer.align``
             # updates parameters to make ``actual`` closer to ``target``. Each
@@ -258,7 +275,16 @@ def main() -> None:
                 filtered = axis.filter_intero(motor_intero)
                 thalamus.submit("intero", filtered)
                 trainer.step(
-                    [dmn.fusion, motor.area.model.transformer, augmenter],
+                    [
+                        dmn.fusion,
+                        motor.area.model.transformer,
+                        augmenter,
+                        motor.damp_lora,
+                        insular.short_lora,
+                        insular.long_lora,
+                        insula.short_lora,
+                        insula.long_lora,
+                    ],
                     teach_emb,
                     lr_scale=2.0,
                 )
@@ -271,6 +297,8 @@ def main() -> None:
         if viewer:
             viewer.close()
         audio_buf.close()
+        insular.save()
+        insula.save()
         hippocampus.save()
         motor.save()
         augmenter.save()
