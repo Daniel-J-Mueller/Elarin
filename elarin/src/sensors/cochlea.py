@@ -21,7 +21,7 @@ class Cochlea:
         """Return encoder features for ``audio`` samples."""
         # ``audio`` may be provided on GPU but Whisper's feature extractor
         # operates on CPU numpy arrays. Convert each tensor appropriately.
-        cpu_audio = [a.detach().cpu() for a in audio]
+        cpu_audio = [a.detach().cpu().numpy() for a in audio]
         inputs = self.processor(cpu_audio, return_tensors="pt", sampling_rate=16000)
         inputs = inputs.to(self.device)
         features = self.model.encoder(inputs.input_features).last_hidden_state
