@@ -18,7 +18,11 @@ class Cochlea:
 
     @torch.no_grad()
     def encode(self, audio: Iterable[torch.Tensor]) -> torch.Tensor:
-        # ``audio`` is expected to be an iterable of 1D tensors (samples)
-        inputs = self.processor(audio, return_tensors="pt", sampling_rate=16000).to(self.device)
+        """Return encoder features for ``audio`` samples."""
+        # ``audio`` may be provided on GPU but Whisper's feature extractor
+        # operates on CPU numpy arrays. Convert each tensor appropriately.
+        cpu_audio = [a.detach().cpu() for a in audio]
+        inputs = self.processor(cpu_audio, return_tensors="pt", sampling_rate=16000)
+        inputs = inputs.to(self.device)
         features = self.model.encoder(inputs.input_features).last_hidden_state
         return features
