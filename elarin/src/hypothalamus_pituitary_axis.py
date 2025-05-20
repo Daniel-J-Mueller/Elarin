@@ -54,3 +54,12 @@ class HypothalamusPituitaryAxis:
         self.habituation = max(0.0, min(1.0, self.habituation))
         self.prev_intero = emb.detach().cpu()
         return emb * self.habituation
+
+    def update_valence(self, valence: float) -> None:
+        """Adjust dopamine and serotonin based on subjective valence."""
+        pos = max(0.0, float(valence))
+        neg = max(0.0, float(-valence))
+        self.dopamine = 0.95 * self.dopamine + pos
+        self.serotonin = 0.95 * self.serotonin + neg
+        self.dopamine = max(0.0, min(1.0, self.dopamine))
+        self.serotonin = max(0.0, min(1.0, self.serotonin))

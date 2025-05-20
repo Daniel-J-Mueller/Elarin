@@ -61,6 +61,10 @@ def main() -> None:
         device=devices["language_areas"],
         token_table_path=f"{persist_dir}/token_embeddings.npy",
     )
+    like_emb = wernicke.encode(["I like that"]).mean(dim=1).to(devices["dmn"]) 
+    dislike_emb = (
+        wernicke.encode(["I don't like that"]).mean(dim=1).to(devices["dmn"])
+    )
 
     dmn = DefaultModeNetwork(
         audio_dim=896,
@@ -117,6 +121,7 @@ def main() -> None:
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
     prev_context = None
+    silent_steps = 0
 
     cam = None
     viewer = None
@@ -229,6 +234,13 @@ def main() -> None:
                 novelty = float(1.0 - sim.item())
 
             axis.step(novelty, 0.0)
+            like_sim = torch.nn.functional.cosine_similarity(
+                context.view(-1), like_emb.view(-1), dim=0
+            ).item()
+            dislike_sim = torch.nn.functional.cosine_similarity(
+                context.view(-1), dislike_emb.view(-1), dim=0
+            ).item()
+            axis.update_valence(like_sim - dislike_sim)
             prev_context = context.detach()
             recalled = hippocampus.query(
                 "context", context.squeeze(0).detach().cpu().numpy(), k=5
@@ -268,6 +280,13 @@ def main() -> None:
             else:
                 out_text = ""
                 out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])
+            if out_text:
+                silent_steps = 0
+            else:
+                silent_steps += 1
+                if silent_steps > 20:
+                    axis.dopamine = min(1.0, axis.dopamine + 0.2)
+                    silent_steps = 10
 
             insula_emb = insula(out_aug)
             hippocampus.add_episode(

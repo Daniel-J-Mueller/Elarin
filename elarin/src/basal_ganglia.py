@@ -30,8 +30,7 @@ class BasalGanglia(nn.Module):
         prob = float(self.net(embedding.to(self.device)))
         # Modulate gating probability using hormone levels if available
         if self.axis is not None:
-            mod = (
-                1.0 + 0.5 * float(self.axis.dopamine) - 0.3 * float(self.axis.serotonin)
-            )
-            prob *= mod
-        return prob > 0.5
+            mod = 0.5 * float(self.axis.dopamine) - 0.3 * float(self.axis.serotonin)
+            prob += mod
+        prob = max(0.0, min(1.0, prob))
+        return prob > 0.4
