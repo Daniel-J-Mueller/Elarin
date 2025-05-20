@@ -17,19 +17,22 @@ class FatigueLoRA(nn.Module):
         self.A = nn.Parameter(torch.zeros(r, in_dim))
         self.B = nn.Parameter(torch.zeros(out_dim, r))
         self.register_buffer("fatigue", torch.ones(out_dim))
-        self.register_buffer(
-            "recovery", torch.rand(out_dim) * 0.01 + 0.005
-        )
+        self.register_buffer("recovery", torch.rand(out_dim) * 0.01 + 0.005)
         self.decay = decay
         self.r = r
         self.to(device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = (x @ self.A.t()) @ self.B.t() / max(1, self.r)
-        out = out * self.fatigue.view(1, -1)
+        out = torch.matmul(x, self.A.t())
+        out = torch.matmul(out, self.B.t()) / max(1, self.r)
+        fatigue = self.fatigue.view(*([1] * (out.dim() - 1)), -1)
+        out = out * fatigue
         with torch.no_grad():
-            usage = out.abs().mean(dim=0).view(-1)
-            decay_factor = torch.pow(torch.as_tensor(self.decay, device=usage.device), usage)
+            dims = tuple(range(out.dim() - 1))
+            usage = out.abs().mean(dim=dims).view(-1)
+            decay_factor = torch.pow(
+                torch.as_tensor(self.decay, device=usage.device), usage
+            )
             self.fatigue.mul_(decay_factor)
             self.fatigue.add_(self.recovery)
             self.fatigue.clamp_(0.0, 1.0)
@@ -39,7 +42,9 @@ class FatigueLoRA(nn.Module):
 class LongTermLoRA(nn.Module):
     """Simple LoRA adapter for long-term filtering."""
 
-    def __init__(self, in_dim: int, out_dim: int, r: int = 4, device: str = "cpu") -> None:
+    def __init__(
+        self, in_dim: int, out_dim: int, r: int = 4, device: str = "cpu"
+    ) -> None:
         super().__init__()
         self.A = nn.Parameter(torch.zeros(r, in_dim))
         self.B = nn.Parameter(torch.zeros(out_dim, r))
@@ -47,4 +52,6 @@ class LongTermLoRA(nn.Module):
         self.to(device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return (x @ self.A.t()) @ self.B.t() / max(1, self.r)
+        out = torch.matmul(x, self.A.t())
+        out = torch.matmul(out, self.B.t()) / max(1, self.r)
+        return out
