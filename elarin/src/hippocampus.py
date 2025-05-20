@@ -29,7 +29,11 @@ class Hippocampus:
         if len(self.memory) >= self.capacity:
             self.memory.pop(0)
         # Ensure all arrays are float32 for consistency
-        clean = {m: emb.astype(np.float32) for m, emb in episode.items()}
+        clean = {}
+        for m, emb in episode.items():
+            if m in self.dims and emb.shape[-1] != self.dims[m]:
+                continue
+            clean[m] = emb.astype(np.float32)
         self.memory.append(clean)
 
     def query(self, modality: str, embedding: np.ndarray, k: int = 5) -> Dict[str, np.ndarray]:
@@ -54,6 +58,9 @@ class Hippocampus:
             m = ep[modality]
             if m.ndim > 1:
                 m = m.mean(axis=0)
+            if m.shape[0] != emb.shape[0]:
+                scores.append(-1.0)
+                continue
             score = float(
                 np.dot(emb, m)
                 / (np.linalg.norm(emb) * np.linalg.norm(m) + 1e-8)

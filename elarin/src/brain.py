@@ -7,6 +7,8 @@ import cv2
 import numpy as np
 from pathlib import Path
 from .sensors.speech_recognizer import SpeechRecognizer
+from .sensors.cochlea import Cochlea
+from .auditory_cortex import AuditoryCortex
 
 from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
@@ -49,6 +51,8 @@ def main() -> None:
 
     retina = Retina(models["clip"], device=devices["retina"])
     occipital = OccipitalLobe(device=devices["occipital_lobe"])
+    cochlea = Cochlea(models["whisper"], device=devices["cochlea"])
+    auditory = AuditoryCortex(device=devices["auditory_cortex"])
 
     wernicke = WernickesArea(
         models["gpt2"],
@@ -56,14 +60,20 @@ def main() -> None:
         token_table_path=f"{persist_dir}/token_embeddings.npy",
     )
 
-    dmn = DefaultModeNetwork(intero_dim=768, hidden_dim=2048, output_dim=768, num_layers=4).to(devices["dmn"])
+    dmn = DefaultModeNetwork(
+        audio_dim=896,
+        intero_dim=768,
+        hidden_dim=2048,
+        output_dim=768,
+        num_layers=4,
+    ).to(devices["dmn"])
     # Weight sensory inputs slightly higher than internal interoceptive signals
     # Increase audio and vision emphasis to encourage responsiveness
     dmn.set_modality_weights(vision=1.4, audio=1.4, intero=1.0)
     hippocampus = Hippocampus(
         dims={
             "vision": 128,
-            "audio": 768,
+            "audio": 896,
             "intero": 768,
             "context": 768,
             "motor": 768,
@@ -140,12 +150,17 @@ def main() -> None:
             # Compute a simple RMS volume estimate and boost the gain for display
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
             spoken = ""
+            audio_feat = torch.zeros(1, 128, device=devices["auditory_cortex"])
             # Ignore near-silent audio to avoid hallucinated transcripts
             if audio_level > 0.02:
                 spoken = speech_recognizer.transcribe(audio_np)
+                audio_tensor = torch.from_numpy(audio_np).float().to(cochlea.device)
+                emb = cochlea.encode([audio_tensor])
+                audio_feat = auditory.process(emb)
             if spoken:
                 flow.observe(wernicke.tokenizer.encode(spoken))
                 text_emb = wernicke.encode([spoken]).mean(dim=1)
+                temporal.clear()
             else:
                 text_emb = torch.zeros(
                     1,
@@ -156,9 +171,13 @@ def main() -> None:
             spec_emb = temporal.embedding(wernicke)
             spec_emb = augmenter(spec_emb)
             if spoken:
-                combined_audio = 0.8 * user_emb + 0.2 * spec_emb
+                text_mix = 0.9 * user_emb + 0.1 * spec_emb
             else:
-                combined_audio = spec_emb
+                text_mix = spec_emb
+            combined_audio = torch.cat([
+                text_mix.to(audio_feat.device),
+                audio_feat,
+            ], dim=-1)
             thalamus.submit("audio", combined_audio)
 
             vision = thalamus.relay("vision")
@@ -169,7 +188,7 @@ def main() -> None:
 
             audio = thalamus.relay("audio")
             if audio is None:
-                audio = torch.zeros(1, user_emb.size(-1), device=dmn_device)
+                audio = torch.zeros(1, 896, device=dmn_device)
             else:
                 audio = audio.to(dmn_device)
 
