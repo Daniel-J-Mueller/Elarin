@@ -33,6 +33,7 @@ This layout keeps sensory preprocessing together, while higher order decision an
 3. During runtime the `trainer` service applies Hebbian updates continuously.
 4. If a weight value equals the sentinel (e.g. `-1e9`) skip the connection. When activity reinforces a path, replace the sentinel with a small positive weight.
 5. Store per-region embeddings for phrases like “good” and “bad” in a table using ``utils/valence_table.py`` so later comparisons are trivial.
+6. The hippocampus maintains a FAISS index for quick nearest-neighbour recall of episodic embeddings.
 
 ## 4. Data Flow Updates
 
@@ -50,9 +51,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
 ## 5. Next Steps
 
 - Split existing monolithic checkpoints into per-region files.
-- Create placeholder MLP models for regions not yet implemented.
 - Define GPU affinity for every script in `scripts/` to honour the allocation table. *(in progress)*
-- Integrate a FAISS-based recall index in the hippocampus for faster episodic queries.
 - Replace the repetitive “hereby” motor output by passing proposed tokens through the cerebellum and insular cortex before final emission.
+- Connect all regions over a ZeroMQ message bus to match the relay behaviour of the corpus callosum and thalamus.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

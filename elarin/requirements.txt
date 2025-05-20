@@ -11,3 +11,4 @@ openai-whisper
 pygame
 tqdm
 pyyaml
+faiss-cpu
