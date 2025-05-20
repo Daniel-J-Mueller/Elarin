@@ -53,9 +53,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 ## 5. Next Steps
 
-- Fine-tune the subthalamic nucleus inhibition threshold using reinforcement signals.
 - Investigate distributed hippocampal training strategies.
-- Integrate the ``TemporalLobe`` speculation buffer into the DMN context.
-- Leverage ``SemanticFlow`` to model cause/effect token transitions.
+- Use ``SemanticFlow`` predictions to seed the ``TemporalLobe`` speculation buffer.
+- Evaluate the reinforcement schedule for the subthalamic nucleus threshold.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

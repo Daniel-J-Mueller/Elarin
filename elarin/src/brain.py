@@ -31,6 +31,7 @@ from .hippocampus import Hippocampus
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
+from .semantic_flow import SemanticFlow
 from .utils.config import load_config
 from .utils.logger import get_logger
 from .viewer import Viewer
@@ -112,6 +113,10 @@ def main() -> None:
         persist_path=f"{persist_dir}/insular.pt",
     )
     temporal = TemporalLobe()
+    sem_flow = SemanticFlow(
+        wernicke.tokenizer.vocab_size,
+        persist_path=f"{persist_dir}/semantic_flow",
+    )
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
@@ -295,6 +300,8 @@ def main() -> None:
                 out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
                 temporal.add_speculation(cand_texts)
                 temporal.consume(out_text)
+                if out_text:
+                    sem_flow.observe(wernicke.tokenizer.encode(out_text))
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
@@ -330,6 +337,7 @@ def main() -> None:
                 valence=valence,
             )
             axis.update_valence(valence)
+            stn.reinforce(valence)
             motor_intero = insular(out_aug)
             filtered = axis.filter_intero(motor_intero)
             # Negate feedback to dampen repeated thoughts
@@ -367,6 +375,7 @@ def main() -> None:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
                 teach_val = amygdala.evaluate(teach_emb)
+                sem_flow.observe(wernicke.tokenizer.encode(taught))
                 hippocampus.add_episode(
                     {
                         "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
@@ -375,6 +384,7 @@ def main() -> None:
                     valence=teach_val,
                 )
                 axis.update_valence(teach_val)
+                stn.reinforce(teach_val)
                 motor_intero = insular(teach_emb)
                 filtered = axis.filter_intero(motor_intero)
                 # Negate feedback to dampen repeated thoughts
@@ -416,6 +426,7 @@ def main() -> None:
         hippocampus.save()
         motor.save()
         augmenter.save()
+        sem_flow.save()
 
 
 if __name__ == "__main__":
