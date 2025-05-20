@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from pathlib import Path
 
 from .utils.adapters import FatigueLoRA, LongTermLoRA
 from .utils.sentinel import SentinelLinear
@@ -12,7 +13,13 @@ from .utils.sentinel import SentinelLinear
 class PrefrontalCortex(nn.Module):
     """Network modelling executive gating over sensations and actions."""
 
-    def __init__(self, input_dim: int = 768, hidden_dim: int = 128, device: str = "cpu") -> None:
+    def __init__(
+        self,
+        input_dim: int = 768,
+        hidden_dim: int = 128,
+        device: str = "cpu",
+        persist_path: str | None = None,
+    ) -> None:
         super().__init__()
         # Single value that modulates Go/No-Go probability
         self.action_net = nn.Sequential(
@@ -31,6 +38,10 @@ class PrefrontalCortex(nn.Module):
         self.act = nn.Sigmoid()
         self.device = device
         self.to(device)
+        self.persist_path = Path(persist_path) if persist_path else None
+        if self.persist_path and self.persist_path.exists():
+            state = torch.load(self.persist_path, map_location=device)
+            self.load_state_dict(state)
 
     @torch.no_grad()
     def forward(self, context: torch.Tensor) -> torch.Tensor:
@@ -46,3 +57,9 @@ class PrefrontalCortex(nn.Module):
         ctx = context.to(self.device)
         w = self.act(self.filter_net(ctx)).squeeze(0)
         return {"vision": float(w[0]), "audio": float(w[1]), "intero": float(w[2])}
+
+    def save(self, path: str | None = None) -> None:
+        target = path or self.persist_path
+        if not target:
+            return
+        torch.save(self.state_dict(), target)
