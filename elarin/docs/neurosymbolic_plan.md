@@ -34,6 +34,8 @@ This layout keeps sensory preprocessing together, while higher order decision an
 4. If a weight value equals the sentinel (e.g. `-1e9`) skip the connection. When activity reinforces a path, replace the sentinel with a small positive weight.
 5. Each region stores its own checkpoint in ``elarin/persistent/``.
 6. Adapter weights are written with msgpack for faster reloads.
+7. Sensors publish raw embeddings over ``MessageBus`` topics which cortex modules
+   subscribe to for asynchronous processing.
 
 ## 4. Data Flow Updates
 
@@ -51,7 +53,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
 ## 5. Next Steps
 
 - Fine-tune the subthalamic nucleus inhibition threshold using reinforcement signals.
-- Connect sensors to cortex modules via the new asynchronous MessageBus channels.
 - Investigate distributed hippocampal training strategies.
+- Measure MessageBus throughput and extend it to hippocampal replay streams.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
