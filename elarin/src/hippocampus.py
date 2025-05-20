@@ -24,6 +24,7 @@ class Hippocampus:
         persist_path: Optional[str] = None,
         use_faiss: bool = True,
         compressed: bool = True,
+        recall_threshold: float = 0.0,
     ) -> None:
         self.dims = dims
         self.capacity = capacity
@@ -34,6 +35,7 @@ class Hippocampus:
         self.use_faiss = use_faiss and faiss is not None
         self.index: Dict[str, "faiss.Index"] = {}
         self.mapping: Dict[str, List[int]] = {}
+        self.recall_threshold = recall_threshold
 
         if self.persist_path and self.persist_path.exists():
             try:
@@ -96,9 +98,13 @@ class Hippocampus:
         if not self.memory:
             return {}
         emb = embedding.astype(np.float32)
+        best_score = 0.0
         if self.use_faiss and modality in self.index and self.index[modality].ntotal > 0:
-            _, faiss_idx = self.index[modality].search(emb.reshape(1, -1), min(k, self.index[modality].ntotal))
+            scores, faiss_idx = self.index[modality].search(
+                emb.reshape(1, -1), min(k, self.index[modality].ntotal)
+            )
             idx = [self.mapping[modality][i] for i in faiss_idx[0]]
+            best_score = float(scores[0][0]) if scores.size > 0 else 0.0
         else:
             scores = []
             for ep in self.memory:
@@ -117,6 +123,10 @@ class Hippocampus:
                 )
                 scores.append(score)
             idx = np.argsort(scores)[-k:][::-1]
+            if scores:
+                best_score = float(scores[idx[0]])
+        if best_score < self.recall_threshold:
+            return {}
         collected: Dict[str, List[np.ndarray]] = {m: [] for m in self.dims}
         valences: List[float] = []
         for i in idx:

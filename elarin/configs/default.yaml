@@ -31,5 +31,6 @@ settings:
   debug_no_video: false
   # Capacity of episodic memory buffer
   hippocampus_capacity: 1000000
+  hippocampus_recall_threshold: 0.2
   # Number of speculative motor tokens to generate per step (debug mode)
   motor_candidates: 1

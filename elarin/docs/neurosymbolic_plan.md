@@ -33,7 +33,9 @@ load seed weights from ``elarin/models`` and resume adapters from
 ``elarin/persistent``. Checkpoints are persisted via msgpack and sensors publish
 embeddings through the ``MessageBus``. Trainer updates now run continually with
 sentinel-aware down-regulation and bus throughput metrics are available for
-tuning the replay buffer.
+tuning the replay buffer. The prefrontal cortex now emits modality weights that
+filter incoming sensations, and the subthalamic nucleus keeps a moving-average
+baseline to better time inhibitory pulses.
 
 ## 4. Data Flow Updates
 
@@ -50,13 +52,12 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 ## 5. Next Steps
 
-- Investigate distributed hippocampal training strategies and tune recall
-  thresholds.  The hippocampus integrates sensory context via the entorhinal
-  cortex to form memories as noted in the reference text【F:human_brain_components_reference.txt†L108-L113】.
-- Evaluate the reinforcement schedule for the subthalamic nucleus threshold to
-  better mimic its role in delaying impulsive actions【F:human_brain_components_reference.txt†L246-L250】.
-- Expand the prefrontal gating mechanism so that executive signals can filter
-  irrelevant sensations before actions are produced, echoing the description of
-  the prefrontal cortex【F:human_brain_components_reference.txt†L53-L56】.
+- Investigate distributed hippocampal training strategies. Recall thresholds are
+  now configurable and low similarity results are ignored, echoing how the
+  entorhinal cortex funnels only salient memories【F:human_brain_components_reference.txt†L108-L113】.
+- Profile how the new subthalamic nucleus baseline adapts over long sessions and
+  whether additional hormone signals should modulate it【F:human_brain_components_reference.txt†L246-L250】.
+- Measure the effect of modality filtering on reaction time and adjust the
+  executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
