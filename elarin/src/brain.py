@@ -16,6 +16,7 @@ from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .hippocampus import Hippocampus
+from .semantic_flow import SemanticFlow
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
@@ -69,6 +70,7 @@ def main() -> None:
     )
     axis = HypothalamusPituitaryAxis()
     temporal = TemporalLobe()
+    flow = SemanticFlow(len(wernicke.tokenizer), persist_path=f"{persist_dir}/semantic_flow.json")
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
@@ -146,6 +148,7 @@ def main() -> None:
             )
             spoken = asr_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
             if spoken:
+                flow.observe(wernicke.tokenizer.encode(spoken))
                 text_emb = wernicke.encode([spoken]).mean(dim=1)
             else:
                 text_emb = torch.zeros(
@@ -192,6 +195,7 @@ def main() -> None:
                         thalamus.submit(modality, torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0))
 
             out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
+            flow.observe(wernicke.tokenizer.encode(out_text))
             temporal.add_speculation(cand_texts)
             temporal.consume(out_text)
             cand_aug = augmenter(cand_embs)
@@ -233,6 +237,7 @@ def main() -> None:
             else:
                 taught = None
             if taught:
+                flow.observe(wernicke.tokenizer.encode(taught))
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
                 hippocampus.add_episode({"motor": teach_emb.squeeze(0).detach().cpu().numpy()})
@@ -254,6 +259,7 @@ def main() -> None:
         hippocampus.save()
         motor.save()
         augmenter.save()
+        flow.save()
 
 
 if __name__ == "__main__":
