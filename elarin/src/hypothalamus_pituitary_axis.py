@@ -9,8 +9,9 @@ class HypothalamusPituitaryAxis:
 
     def __init__(
         self,
-        habituation_decay: float = 0.95,
+        habituation_decay: float = 0.9,
         habituation_recovery: float = 0.02,
+        habituation_threshold: float = 0.92,
     ) -> None:
         self.dopamine = 0.0
         self.norepinephrine = 0.0
@@ -20,6 +21,8 @@ class HypothalamusPituitaryAxis:
         self.habituation = 1.0
         self.hab_decay = habituation_decay
         self.hab_recovery = habituation_recovery
+        self.hab_threshold = habituation_threshold
+        self.repeat_count = 0
         self.prev_intero: torch.Tensor | None = None
 
     def step(self, novelty: float, error: float) -> None:
@@ -41,9 +44,11 @@ class HypothalamusPituitaryAxis:
             sim = torch.nn.functional.cosine_similarity(
                 emb.view(-1), prev.view(-1), dim=0
             ).item()
-            if sim > 0.95:
-                self.habituation *= self.hab_decay
+            if sim > self.hab_threshold:
+                self.repeat_count += 1
+                self.habituation *= self.hab_decay ** self.repeat_count
             else:
+                self.repeat_count = 0
                 self.habituation += (1.0 - self.habituation) * self.hab_recovery
 
         self.habituation = max(0.0, min(1.0, self.habituation))
