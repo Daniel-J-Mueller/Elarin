@@ -398,6 +398,7 @@ def main() -> None:
             axis.update_valence(valence)
             stn.reinforce(valence)
             axis.adjust_inhibition(stn.baseline)
+            axis.memory_pressure(hippocampus.memory_usage_gb())
             motor_intero = insular(out_aug)
             filtered = axis.filter_intero(motor_intero)
             # Negate feedback to dampen repeated thoughts
@@ -432,6 +433,7 @@ def main() -> None:
                     stn.baseline,
                     hippocampus.memory_usage_gb(),
                 )
+                axis.memory_pressure(hippocampus.memory_usage_gb())
                 axis.log_levels(logger)
 
             if viewer:
@@ -456,6 +458,7 @@ def main() -> None:
                 axis.update_valence(teach_val)
                 stn.reinforce(teach_val)
                 axis.adjust_inhibition(stn.baseline)
+                axis.memory_pressure(hippocampus.memory_usage_gb())
                 motor_intero = insular(teach_emb)
                 filtered = axis.filter_intero(motor_intero)
                 # Negate feedback to dampen repeated thoughts
