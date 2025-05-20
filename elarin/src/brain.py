@@ -58,7 +58,8 @@ def main() -> None:
 
     dmn = DefaultModeNetwork(intero_dim=768, hidden_dim=2048, output_dim=768, num_layers=4).to(devices["dmn"])
     # Weight sensory inputs slightly higher than internal interoceptive signals
-    dmn.set_modality_weights(vision=1.2, audio=1.2, intero=1.0)
+    # Increase audio and vision emphasis to encourage responsiveness
+    dmn.set_modality_weights(vision=1.4, audio=1.4, intero=1.0)
     hippocampus = Hippocampus(
         dims={
             "vision": 128,
@@ -134,7 +135,7 @@ def main() -> None:
             audio_level = float(np.sqrt(np.mean(audio_np ** 2))) * 10.0
             spoken = ""
             # Ignore near-silent audio to avoid hallucinated transcripts
-            if audio_level > 0.05:
+            if audio_level > 0.02:
                 spoken = speech_recognizer.transcribe(audio_np)
             if spoken:
                 flow.observe(wernicke.tokenizer.encode(spoken))
@@ -148,7 +149,10 @@ def main() -> None:
             user_emb = augmenter(text_emb)
             spec_emb = temporal.embedding(wernicke)
             spec_emb = augmenter(spec_emb)
-            combined_audio = 0.5 * (user_emb + spec_emb)
+            if spoken:
+                combined_audio = 0.8 * user_emb + 0.2 * spec_emb
+            else:
+                combined_audio = spec_emb
             thalamus.submit("audio", combined_audio)
 
             vision = thalamus.relay("vision")
