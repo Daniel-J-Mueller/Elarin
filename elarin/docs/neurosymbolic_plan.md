@@ -30,11 +30,12 @@ This layout keeps sensory preprocessing together, while higher order decision an
 
 The groundwork described in the previous revision has been implemented. Regions
 load seed weights from ``elarin/models`` and resume adapters from
-``elarin/persistent``. Checkpoints are persisted via msgpack and sensors publish
-embeddings through the ``MessageBus``. Trainer updates now run continually with
-sentinel-aware down-regulation and bus throughput metrics are available for
-tuning the replay buffer. The prefrontal cortex now emits modality weights that
-filter incoming sensations, and the subthalamic nucleus keeps a moving-average
+``elarin/persistent``. Sensors publish embeddings through the ``MessageBus`` and
+trainer updates run continually with sentinel-aware down-regulation. The
+hippocampus now ignores low-similarity memories according to a configurable
+``recall_threshold`` and the Cochlea module consolidates audio embeddings and
+transcription in one class.  The prefrontal cortex emits modality weights that
+filter incoming sensations, while the subthalamic nucleus keeps a moving-average
 baseline to better time inhibitory pulses.
 
 ## 4. Data Flow Updates
@@ -52,12 +53,11 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 ## 5. Next Steps
 
-- Investigate distributed hippocampal training strategies. Recall thresholds are
-  now configurable and low similarity results are ignored, echoing how the
-  entorhinal cortex funnels only salient memories【F:human_brain_components_reference.txt†L108-L113】.
-- Profile how the new subthalamic nucleus baseline adapts over long sessions and
-  whether additional hormone signals should modulate it【F:human_brain_components_reference.txt†L246-L250】.
-- Measure the effect of modality filtering on reaction time and adjust the
-  executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
+- Investigate distributed hippocampal training strategies to scale memory while
+  preserving the entorhinal gating of salient events【F:human_brain_components_reference.txt†L108-L113】.
+- Track how the subthalamic nucleus baseline drifts over long sessions and tie
+  it to hormone modulators for more realistic inhibition control【F:human_brain_components_reference.txt†L246-L250】.
+- Measure the impact of modality filtering and the unified Cochlea on reaction
+  time, then refine the executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
