@@ -24,7 +24,7 @@ class CuriosityTracker:
         if token_id == self.last_token:
             self.repeat_streak += 1
         else:
-            self.repeat_streak = 0
+            self.repeat_streak = 1
         self.last_token = token_id
         self.counts[token_id] = self.counts.get(token_id, 0) + 1
 
@@ -34,9 +34,12 @@ class CuriosityTracker:
             return emb
 
         strength = min(1.0, self.repeat_streak / 2.0)
+        # Additive jitter instead of multiplicative so zero embeddings can
+        # still diverge.  Frequency noise preserves overall structure while
+        # providing stochastic exploration.
         freq = torch.fft.rfft(emb, dim=-1)
         noise = (torch.rand_like(freq.real) - 0.5) * 2.0 * strength
-        freq = freq * (1.0 + noise + 0j)
+        freq = freq + noise + 0j
         return torch.fft.irfft(freq, n=emb.shape[-1], dim=-1)
 
     def state_dict(self) -> Dict[str, Any]:
