@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 def generate(
     model_dir: str | Path,
     output: Path,
-    device: str = "cpu",
+    device: str = "cuda",
     batch_size: int = 1024,
 ) -> None:
     """Create a table of embeddings for every tokenizer token."""
