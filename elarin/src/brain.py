@@ -18,6 +18,7 @@ from .language_areas.wernickes_area import WernickesArea
 from .language_areas.augmenter import LanguageAugmenter
 from .insular_cortex import InsularCortex
 from .basal_ganglia import BasalGanglia
+from .subthalamic_nucleus import SubthalamicNucleus
 from .cerebellum import Cerebellum
 from .corpus_callosum import CorpusCallosum
 from .amygdala import Amygdala
@@ -98,8 +99,13 @@ def main() -> None:
     pfc = PrefrontalCortex(device=devices["dmn"])
     corpus = CorpusCallosum(embed_dim=768, device=devices["dmn"])
     axis = HypothalamusPituitaryAxis()
+    stn = SubthalamicNucleus(device=devices["dmn"])
     basal = BasalGanglia(
-        input_dim=768, device=devices["dmn"], axis=axis, prefrontal=pfc
+        input_dim=768,
+        device=devices["dmn"],
+        axis=axis,
+        prefrontal=pfc,
+        stn=stn,
     )
     insular = InsularCortex(
         device=devices["dmn"],
