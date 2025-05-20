@@ -40,7 +40,11 @@ shards for distributed storage and a ``salience_threshold`` so only novel
 episodes pass through the entorhinal gate【F:human_brain_components_reference.txt†L108-L113】.
 The subthalamic nucleus baseline is forwarded into the hypothalamic axis to
 adjust norepinephrine and acetylcholine levels, mimicking inhibitory control
-mechanisms【F:human_brain_components_reference.txt†L246-L250】.
+mechanisms【F:human_brain_components_reference.txt†L246-L250】. Hormone updates
+now incorporate a moving-average baseline so shifts in novelty or prediction
+error gradually modulate dopamine and norepinephrine rather than causing abrupt
+swings. This neuroadaptive approach mirrors the entorhinal–hippocampal gating
+mechanism which filters salient episodes【F:human_brain_components_reference.txt†L108-L113】.
 Debug logs can now be written to ``logs/debug.log`` when ``log_to_file`` is
 enabled in ``configs/default.yaml``. These logs record the subthalamic nucleus
 baseline and the current hippocampal memory footprint so long term trends can be
@@ -63,8 +67,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 ## 5. Next Steps
 
-- Analyse the logged subthalamic nucleus baseline over long sessions and adjust hormone coupling for better inhibition control【F:human_brain_components_reference.txt†L246-L250】.
 - Measure the impact of modality filtering and the unified Cochlea on reaction time, then refine the executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
 - Stress-test the ``DistributedHippocampus`` using the new memory usage reports and refine salience gating to prevent overload【F:human_brain_components_reference.txt†L108-L113】.
+- Evaluate the neuroadaptive hormone logic over multi-hour runs and tune the moving-average rates so dopamine and norepinephrine track trends without oscillation. Include baseline deviation logs to further study inhibitory coupling【F:human_brain_components_reference.txt†L246-L250】.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
