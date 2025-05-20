@@ -113,6 +113,9 @@ The ``settings`` section of ``configs/default.yaml`` now includes
 ``motor_candidates`` which controls how many speculative tokens the motor
 cortex generates each step. Increasing this value trains on multiple
 possible outputs while only printing the highest-probability token.
+``neurogenesis`` can also be enabled to automatically seed blank region
+weights using Kaiming initialization whenever no trained parameters are
+found.
 
 All learned memories and adapter weights are automatically written to the
 ``elarin/persistent/`` directory so progress can be resumed on the next

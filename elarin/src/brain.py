@@ -48,6 +48,7 @@ from .utils.logger import get_logger, enable_file_logging
 from .viewer import Viewer
 from .utils.camera import Camera
 from .utils.audio_buffer import AudioBuffer
+from .utils.neurogenesis import maybe_initialize
 
 
 def main() -> None:
@@ -68,12 +69,15 @@ def main() -> None:
     )
     motor_candidates = int(settings.get("motor_candidates", 1))
     log_to_file = bool(settings.get("log_to_file", False))
+    neurogenesis = bool(settings.get("neurogenesis", False))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
 
     if not log_dir.is_absolute():
         log_dir = BASE_DIR / log_dir
+
+    init_state_file = persist_dir / "brain_init_state.json"
 
     if log_to_file:
         enable_file_logging(str(log_dir))
@@ -112,14 +116,35 @@ def main() -> None:
     sup_parietal = SuperiorParietalLobule(
         device=devices["dmn"], persist_path=f"{persist_dir}/superior_parietal_lobule.pt"
     )
+    maybe_initialize(
+        sup_parietal,
+        f"{persist_dir}/superior_parietal_lobule.pt",
+        "superior_parietal_lobule",
+        neurogenesis,
+        init_state_file,
+    )
     inf_parietal = InferiorParietalLobule(
         device=devices["dmn"], persist_path=f"{persist_dir}/inferior_parietal_lobule.pt"
+    )
+    maybe_initialize(
+        inf_parietal,
+        f"{persist_dir}/inferior_parietal_lobule.pt",
+        "inferior_parietal_lobule",
+        neurogenesis,
+        init_state_file,
     )
     precuneus = Precuneus(
         input_dim=128 + 896 + 768,
         output_dim=768,
         device=devices["dmn"],
         persist_path=f"{persist_dir}/precuneus.pt",
+    )
+    maybe_initialize(
+        precuneus,
+        f"{persist_dir}/precuneus.pt",
+        "precuneus",
+        neurogenesis,
+        init_state_file,
     )
     hip_dims = {
         "vision": 128,
@@ -152,12 +177,41 @@ def main() -> None:
             salience_threshold=salience_thresh,
         )
     dentate = DentateGyrus(device=devices["dmn"], persist_path=f"{persist_dir}/dentate_gyrus.pt")
+    maybe_initialize(
+        dentate,
+        f"{persist_dir}/dentate_gyrus.pt",
+        "dentate_gyrus",
+        neurogenesis,
+        init_state_file,
+    )
     subiculum = Subiculum(device=devices["dmn"], persist_path=f"{persist_dir}/subiculum.pt")
+    maybe_initialize(
+        subiculum,
+        f"{persist_dir}/subiculum.pt",
+        "subiculum",
+        neurogenesis,
+        init_state_file,
+        var_scale=1.1,
+    )
     amygdala = Amygdala(
         device=devices["dmn"], persist_path=f"{persist_dir}/amygdala_emotion.pt"
     )
+    maybe_initialize(
+        amygdala,
+        f"{persist_dir}/amygdala_emotion.pt",
+        "amygdala_emotion",
+        neurogenesis,
+        init_state_file,
+    )
     frontal = FrontalLobe(
         device=devices["dmn"], persist_path=f"{persist_dir}/frontal_lobe.pt"
+    )
+    maybe_initialize(
+        frontal,
+        f"{persist_dir}/frontal_lobe.pt",
+        "frontal_lobe",
+        neurogenesis,
+        init_state_file,
     )
     pfc = frontal.prefrontal
     corpus = CorpusCallosum(
@@ -165,14 +219,70 @@ def main() -> None:
         device=devices["dmn"],
         persist_path=f"{persist_dir}/corpus_callosum_bridge.pt",
     )
+    maybe_initialize(
+        corpus,
+        f"{persist_dir}/corpus_callosum_bridge.pt",
+        "corpus_callosum_bridge",
+        neurogenesis,
+        init_state_file,
+    )
     axis = HypothalamusPituitaryAxis()
     pituitary = PituitaryGland(device=devices["dmn"], persist_path=f"{persist_dir}/pituitary_gland.pt")
+    maybe_initialize(
+        pituitary,
+        f"{persist_dir}/pituitary_gland.pt",
+        "pituitary_gland",
+        neurogenesis,
+        init_state_file,
+    )
     entorhinal = EntorhinalCortex(device=devices["dmn"], persist_path=f"{persist_dir}/entorhinal_cortex.pt")
+    maybe_initialize(
+        entorhinal,
+        f"{persist_dir}/entorhinal_cortex.pt",
+        "entorhinal_cortex",
+        neurogenesis,
+        init_state_file,
+    )
     parietal = ParietalLobe(device=devices["occipital_lobe"], persist_path=f"{persist_dir}/parietal_lobe.pt")
+    maybe_initialize(
+        parietal,
+        f"{persist_dir}/parietal_lobe.pt",
+        "parietal_lobe",
+        neurogenesis,
+        init_state_file,
+    )
     cingulate = CingulateCortex(device=devices["dmn"], persist_path=f"{persist_dir}/cingulate_cortex.pt")
+    maybe_initialize(
+        cingulate,
+        f"{persist_dir}/cingulate_cortex.pt",
+        "cingulate_cortex",
+        neurogenesis,
+        init_state_file,
+    )
     midbrain = Midbrain(device=devices["dmn"], persist_path=f"{persist_dir}/midbrain.pt")
+    maybe_initialize(
+        midbrain,
+        f"{persist_dir}/midbrain.pt",
+        "midbrain",
+        neurogenesis,
+        init_state_file,
+    )
     pons = Pons(device=devices["dmn"], persist_path=f"{persist_dir}/pons.pt")
+    maybe_initialize(
+        pons,
+        f"{persist_dir}/pons.pt",
+        "pons",
+        neurogenesis,
+        init_state_file,
+    )
     medulla = MedullaOblongata(device=devices["dmn"], persist_path=f"{persist_dir}/medulla_oblongata.pt")
+    maybe_initialize(
+        medulla,
+        f"{persist_dir}/medulla_oblongata.pt",
+        "medulla_oblongata",
+        neurogenesis,
+        init_state_file,
+    )
     stn = SubthalamicNucleus(device=devices["dmn"])
     basal = BasalGanglia(
         input_dim=768,
@@ -183,22 +293,92 @@ def main() -> None:
         persist_path=f"{persist_dir}/basal_ganglia_gating.pt",
         submodule_dir=str(persist_dir),
     )
+    maybe_initialize(
+        basal,
+        f"{persist_dir}/basal_ganglia_gating.pt",
+        "basal_ganglia_gating",
+        neurogenesis,
+        init_state_file,
+    )
+    maybe_initialize(
+        basal.caudate,
+        f"{persist_dir}/caudate_nucleus.pt",
+        "caudate_nucleus",
+        neurogenesis,
+        init_state_file,
+    )
+    maybe_initialize(
+        basal.putamen,
+        f"{persist_dir}/putamen.pt",
+        "putamen",
+        neurogenesis,
+        init_state_file,
+    )
+    maybe_initialize(
+        basal.pallidus,
+        f"{persist_dir}/globus_pallidus.pt",
+        "globus_pallidus",
+        neurogenesis,
+        init_state_file,
+    )
+    maybe_initialize(
+        basal.accumbens,
+        f"{persist_dir}/nucleus_accumbens.pt",
+        "nucleus_accumbens",
+        neurogenesis,
+        init_state_file,
+    )
+    maybe_initialize(
+        basal.nigra,
+        f"{persist_dir}/substantia_nigra.pt",
+        "substantia_nigra",
+        neurogenesis,
+        init_state_file,
+    )
     insular = InsularCortex(
         device=devices["dmn"],
         persist_path=f"{persist_dir}/insular_mapping.pt",
+    )
+    maybe_initialize(
+        insular,
+        f"{persist_dir}/insular_mapping.pt",
+        "insular_mapping",
+        neurogenesis,
+        init_state_file,
     )
     temporal = TemporalLobe()
     augmenter = WernickeAdapter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/wernicke_adapter.pt",
     )
+    maybe_initialize(
+        augmenter,
+        f"{persist_dir}/wernicke_adapter.pt",
+        "wernicke_adapter",
+        neurogenesis,
+        init_state_file,
+    )
     insula = InsularCortex(
         device=devices["motor_cortex"],
         persist_path=f"{persist_dir}/motor_insula.pt",
     )
+    maybe_initialize(
+        insula,
+        f"{persist_dir}/motor_insula.pt",
+        "motor_insula",
+        neurogenesis,
+        init_state_file,
+    )
     cerebellum = Cerebellum(
         device=devices.get("cerebellum", devices["motor_cortex"]),
         persist_path=f"{persist_dir}/cerebellum_correction.pt",
+    )
+    maybe_initialize(
+        cerebellum,
+        f"{persist_dir}/cerebellum_correction.pt",
+        "cerebellum_correction",
+        neurogenesis,
+        init_state_file,
     )
     motor = MotorCortex(
         models["gpt2"],
@@ -207,6 +387,14 @@ def main() -> None:
         axis=axis,
         persist_path=f"{persist_dir}/motor_cortex_generator.pt",
         num_candidates=motor_candidates,
+    )
+    maybe_initialize(
+        motor,
+        f"{persist_dir}/motor_cortex_generator.pt",
+        "motor_cortex_generator",
+        neurogenesis,
+        init_state_file,
+        bias_shift=0.01,
     )
 
     thalamus = Thalamus()
