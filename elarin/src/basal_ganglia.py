@@ -13,6 +13,7 @@ class BasalGanglia(nn.Module):
         hidden_dim: int = 64,
         device: str = "cpu",
         axis: "HypothalamusPituitaryAxis | None" = None,
+        prefrontal: "PrefrontalCortex | None" = None,
     ) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -23,6 +24,7 @@ class BasalGanglia(nn.Module):
         )
         self.device = device
         self.axis = axis
+        self.prefrontal = prefrontal
         self.to(device)
 
     @torch.no_grad()
@@ -32,5 +34,8 @@ class BasalGanglia(nn.Module):
         if self.axis is not None:
             mod = 0.5 * float(self.axis.dopamine) - 0.3 * float(self.axis.serotonin)
             prob += mod
+        if self.prefrontal is not None:
+            pf = float(self.prefrontal(embedding.to(self.prefrontal.device)))
+            prob *= pf
         prob = max(0.0, min(1.0, prob))
         return prob > 0.4

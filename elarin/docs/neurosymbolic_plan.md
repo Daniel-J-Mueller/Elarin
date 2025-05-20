@@ -56,10 +56,10 @@ Outputs are routed through the thalamus or DMN so the overall flow remains consi
 
 ## 5. Implementation Steps
 
-1. **Introduce cerebellum module** for motor error correction. Integrate after motor cortex output so feedback is refined before being sent to the insular cortex.
-2. **Stub corpus callosum** as a pass-through layer to allow future left/right specialisation.
-3. **Extend memory schema** in `Hippocampus` to tag episodes with emotional valence from the amygdala.
-4. **Add prefrontal cortex module** that modulates basal ganglia gating based on long-term goals.
-5. Continue bootstrapping using LoRA adapters for rapid online learning of all new modules.
+- [x] **Introduce cerebellum module** for motor error correction. Integrate after motor cortex output so feedback is refined before being sent to the insular cortex.
+- [x] **Stub corpus callosum** as a pass-through layer to allow future left/right specialisation.
+- [x] **Extend memory schema** in `Hippocampus` to tag episodes with emotional valence from the amygdala.
+- [x] **Add prefrontal cortex module** that modulates basal ganglia gating based on long-term goals.
+- [ ] Continue bootstrapping using LoRA adapters for rapid online learning of all new modules.
 
 This staged approach keeps the current processing order while gradually filling in the missing anatomical regions.
