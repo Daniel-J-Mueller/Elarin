@@ -33,8 +33,9 @@ class FatigueLoRA(nn.Module):
         out = (x @ self.A.t()) @ self.B.t() / max(1, self.r)
         out = out * self.fatigue.view(1, -1)
         with torch.no_grad():
-            usage = out.abs().mean(dim=0)
-            self.fatigue.mul_(self.decay ** usage)
+            usage = out.abs().mean(dim=0).view(-1)
+            decay_factor = torch.pow(torch.as_tensor(self.decay, device=usage.device), usage)
+            self.fatigue.mul_(decay_factor)
             self.fatigue.add_(self.recovery)
             self.fatigue.clamp_(0.0, 1.0)
         return out
