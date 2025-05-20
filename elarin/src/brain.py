@@ -17,6 +17,9 @@ from .language_areas.augmenter import LanguageAugmenter
 from .insular_cortex import InsularCortex
 from .basal_ganglia import BasalGanglia
 from .cerebellum import Cerebellum
+from .corpus_callosum import CorpusCallosum
+from .amygdala import Amygdala
+from .prefrontal_cortex import PrefrontalCortex
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
@@ -89,8 +92,13 @@ def main() -> None:
         capacity=hippocampus_capacity,
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
+    amygdala = Amygdala(device=devices["dmn"])
+    pfc = PrefrontalCortex(device=devices["dmn"])
+    corpus = CorpusCallosum(device=devices["dmn"])
     axis = HypothalamusPituitaryAxis()
-    basal = BasalGanglia(input_dim=768, device=devices["dmn"], axis=axis)
+    basal = BasalGanglia(
+        input_dim=768, device=devices["dmn"], axis=axis, prefrontal=pfc
+    )
     insular = InsularCortex(
         device=devices["dmn"],
         persist_path=f"{persist_dir}/insular.pt",
@@ -227,6 +235,7 @@ def main() -> None:
                     intero = intero.mean(dim=1)
 
             context = dmn(vision, audio, intero)
+            context = corpus.transfer(context)
 
             context_np = context.squeeze(0).detach().cpu().numpy()
             if prev_flow_emb is not None:
@@ -271,6 +280,8 @@ def main() -> None:
                     ).unsqueeze(0)
                     # Prioritize new sensory context over recalled thoughts
                     context = 0.7 * context + 0.3 * recall_ctx
+                if "valence" in recalled:
+                    axis.update_valence(float(recalled["valence"]))
                 # Push other modalities back through the thalamus for replay
                 for modality in ("vision", "audio", "intero", "motor", "speech"):
                     if modality in recalled:
@@ -309,6 +320,7 @@ def main() -> None:
                     silent_steps = 10
 
             insula_emb = insula(out_aug)
+            valence = amygdala.evaluate(context)
             hippocampus.add_episode(
                 {
                     "vision": vision.squeeze(0).detach().cpu().numpy(),
@@ -317,8 +329,10 @@ def main() -> None:
                     "context": context.squeeze(0).detach().cpu().numpy(),
                     "motor": insula_emb.squeeze(0).detach().cpu().numpy(),
                     "speech": user_emb.squeeze(0).detach().cpu().numpy(),
-                }
+                },
+                valence=valence,
             )
+            axis.update_valence(valence)
             motor_intero = insular(out_aug)
             filtered = axis.filter_intero(motor_intero)
             # Negate feedback to dampen repeated thoughts
@@ -348,12 +362,15 @@ def main() -> None:
                 flow.observe(wernicke.tokenizer.encode(taught))
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
+                teach_val = amygdala.evaluate(teach_emb)
                 hippocampus.add_episode(
                     {
                         "motor": teach_emb.squeeze(0).detach().cpu().numpy(),
                         "speech": teach_emb.squeeze(0).detach().cpu().numpy(),
-                    }
+                    },
+                    valence=teach_val,
                 )
+                axis.update_valence(teach_val)
                 motor_intero = insular(teach_emb)
                 filtered = axis.filter_intero(motor_intero)
                 # Negate feedback to dampen repeated thoughts

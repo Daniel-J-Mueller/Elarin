@@ -15,8 +15,8 @@ class Hippocampus:
     def __init__(self, dims: Dict[str, int], capacity: int = 1000, persist_path: Optional[str] = None) -> None:
         self.dims = dims
         self.capacity = capacity
-        # Each entry in ``memory`` is a mapping ``modality -> embedding``
-        self.memory: List[Dict[str, np.ndarray]] = []
+        # Each entry is a mapping ``modality -> embedding`` plus optional ``valence``
+        self.memory: List[Dict[str, np.ndarray | float]] = []
         self.persist_path = Path(persist_path) if persist_path else None
         if self.persist_path and self.persist_path.exists():
             try:
@@ -24,8 +24,8 @@ class Hippocampus:
             except Exception:
                 self.memory = []
 
-    def add_episode(self, episode: Dict[str, np.ndarray]) -> None:
-        """Store a set of embeddings for different modalities."""
+    def add_episode(self, episode: Dict[str, np.ndarray], valence: float = 0.0) -> None:
+        """Store a set of embeddings for different modalities with a valence tag."""
         if len(self.memory) >= self.capacity:
             self.memory.pop(0)
         # Ensure all arrays are float32 for consistency
@@ -34,6 +34,7 @@ class Hippocampus:
             if m in self.dims and emb.shape[-1] != self.dims[m]:
                 continue
             clean[m] = emb.astype(np.float32)
+        clean["valence"] = float(valence)
         self.memory.append(clean)
 
     def query(self, modality: str, embedding: np.ndarray, k: int = 5) -> Dict[str, np.ndarray]:
@@ -69,22 +70,32 @@ class Hippocampus:
 
         idx = np.argsort(scores)[-k:][::-1]
         collected: Dict[str, List[np.ndarray]] = {m: [] for m in self.dims}
+        valences: List[float] = []
         for i in idx:
             ep = self.memory[i]
             for m, val in ep.items():
+                if m == "valence":
+                    valences.append(float(val))
+                    continue
                 if val.ndim > 1:
                     val = val.mean(axis=0)
                 collected.setdefault(m, []).append(val)
 
-        return {
+        result = {
             m: np.mean(vals, axis=0) for m, vals in collected.items() if len(vals) > 0
         }
+        if valences:
+            result["valence"] = float(np.mean(valences))
+        return result
 
     def decay(self, rate: float = 0.99) -> None:
         """Gradually weaken all stored embeddings."""
         for ep in self.memory:
             for m, val in ep.items():
-                ep[m] = val * rate
+                if m == "valence":
+                    ep[m] = float(val) * rate
+                else:
+                    ep[m] = val * rate
 
     def clear(self) -> None:
         """Remove all stored episodes."""
