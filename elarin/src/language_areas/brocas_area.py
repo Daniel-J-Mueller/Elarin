@@ -25,6 +25,9 @@ class BrocasArea:
         hidden: torch.Tensor,
         temperature: float = 1.0,
         num_samples: int = 1,
+        *,
+        history: list[int] | None = None,
+        repetition_penalty: float = 1.0,
     ) -> Iterable[tuple[str, float, int]]:
         """Generate one or more tokens from ``hidden``.
 
@@ -35,7 +38,11 @@ class BrocasArea:
         if embeds.dim() == 2:
             embeds = embeds.unsqueeze(1)
         outputs = self.model(inputs_embeds=embeds)
-        logits = outputs.logits / max(temperature, 1e-5)
+        logits = outputs.logits
+        if history and repetition_penalty > 1.0:
+            hist_ids = torch.tensor(history, dtype=torch.long, device=logits.device)
+            logits[..., hist_ids] /= repetition_penalty
+        logits = logits / max(temperature, 1e-5)
         probs = torch.softmax(logits, dim=-1).squeeze(1)
 
         # ``torch.multinomial`` with ``num_samples > 1`` would produce a single
