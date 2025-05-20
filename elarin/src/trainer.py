@@ -6,6 +6,10 @@ import torch
 from torch import nn
 
 
+SENTINEL = -1e9
+UNTRAINED_INIT = 1e-3
+
+
 class Trainer:
     """Very small placeholder trainer implementing simple Hebbian-like updates."""
 
@@ -60,17 +64,25 @@ class Trainer:
                 if not p.requires_grad:
                     continue
 
-                p.mul_(self.decay)
+                data = p.data
+                sentinel_mask = data == SENTINEL
+                data[~sentinel_mask] *= self.decay
 
                 if p.ndim == 1:
-                    length = min(p.shape[0], act.shape[0])
-                    p[:length].add_(scaled_lr * act.to(p.device)[:length])
+                    length = min(data.shape[0], act.shape[0])
+                    update = scaled_lr * act.to(data.device)[:length]
+                    mask = sentinel_mask[:length]
+                    if mask.any():
+                        data[:length][mask] = UNTRAINED_INIT * update[mask]
+                    data[:length][~mask] += update[~mask]
                 else:
-                    rows = min(p.shape[0], outer.shape[0])
-                    cols = min(p.shape[1], outer.shape[1])
-                    p[:rows, :cols].add_(
-                        scaled_lr * outer.to(p.device)[:rows, :cols]
-                    )
+                    rows = min(data.shape[0], outer.shape[0])
+                    cols = min(data.shape[1], outer.shape[1])
+                    update = scaled_lr * outer.to(data.device)[:rows, :cols]
+                    mask = sentinel_mask[:rows, :cols]
+                    if mask.any():
+                        data[:rows, :cols][mask] = UNTRAINED_INIT * update[mask]
+                    data[:rows, :cols][~mask] += update[~mask]
 
     @torch.no_grad()
     def align(
@@ -108,18 +120,25 @@ class Trainer:
                 if not p.requires_grad:
                     continue
 
-                p.mul_(self.decay)
+                data = p.data
+                sentinel_mask = data == SENTINEL
+                data[~sentinel_mask] *= self.decay
 
                 if p.ndim == 1:
-                    length = min(p.shape[0], error.shape[1])
-                    grad = error.mean(dim=0).to(p.device)[:length]
-                    p[:length].add_(self.lr * lr_scale * grad)
+                    length = min(data.shape[0], error.shape[1])
+                    grad = error.mean(dim=0).to(data.device)[:length]
+                    mask = sentinel_mask[:length]
+                    if mask.any():
+                        data[:length][mask] = UNTRAINED_INIT * grad[mask]
+                    data[:length][~mask] += self.lr * lr_scale * grad[~mask]
                 else:
-                    rows = min(p.shape[0], adjust.shape[0])
-                    cols = min(p.shape[1], adjust.shape[1])
-                    p[:rows, :cols].add_(
-                        self.lr * lr_scale * adjust.to(p.device)[:rows, :cols]
-                    )
+                    rows = min(data.shape[0], adjust.shape[0])
+                    cols = min(data.shape[1], adjust.shape[1])
+                    upd = self.lr * lr_scale * adjust.to(data.device)[:rows, :cols]
+                    mask = sentinel_mask[:rows, :cols]
+                    if mask.any():
+                        data[:rows, :cols][mask] = UNTRAINED_INIT * upd[mask]
+                    data[:rows, :cols][~mask] += upd[~mask]
 
 
 if __name__ == "__main__":

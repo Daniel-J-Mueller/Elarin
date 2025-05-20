@@ -9,6 +9,7 @@ This document outlines how we will evolve Elarin from the current single-model a
 - When possible, new models should share a common format (PyTorch `.pt` or NumPy `.npy`) to avoid additional loaders.
 - Reserve unusual sentinel values for untrained connections so that a region can skip processing them until reinforced.
 - Align neighbouring regions on the same GPU to minimise cross-device copies.
+- Launch scripts now pin each module to the appropriate GPU.
 
 ## 2. Region Allocation
 
@@ -25,6 +26,7 @@ We divide the system into smaller modules. For each area we define the approxima
 | Motor & Insular Cortex      | GPT‑2 half + projections (~60M) | 3 |
 
 This layout keeps sensory preprocessing together, while higher order decision and motor areas share GPUs to reduce latency between them.
+Launch scripts now enforce these assignments using ``CUDA_VISIBLE_DEVICES`` so each service starts on its designated card.
 
 ## 3. Bootstrapping Workflow
 
@@ -34,6 +36,7 @@ This layout keeps sensory preprocessing together, while higher order decision an
 4. If a weight value equals the sentinel (e.g. `-1e9`) skip the connection. When activity reinforces a path, replace the sentinel with a small positive weight.
 5. Store per-region embeddings for phrases like “good” and “bad” in a table using ``utils/valence_table.py`` so later comparisons are trivial.
 6. The hippocampus maintains a FAISS index for quick nearest-neighbour recall of episodic embeddings.
+7. ``Trainer`` now recognises a sentinel weight value of ``-1e9``. Parameters initialised to this constant remain inert until activity overwrites them with a small weight.
 
 ## 4. Data Flow Updates
 
@@ -51,8 +54,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
 ## 5. Next Steps
 
 - Split existing monolithic checkpoints into per-region files.
-- Define GPU affinity for every script in `scripts/` to honour the allocation table. *(in progress)*
-- Replace the repetitive “hereby” motor output by passing proposed tokens through the cerebellum and insular cortex before final emission.
 - Connect all regions over a ZeroMQ message bus to match the relay behaviour of the corpus callosum and thalamus.
+- Expand sentinel-weight handling across all modules so untrained paths remain inactive until reinforced.
+- Investigate lightweight persistence formats to reduce adapter save/load times.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
