@@ -49,12 +49,15 @@ class BasalGanglia(nn.Module):
         self.pallidus = GlobusPallidus(input_dim, hidden_dim, device=device, persist_path=p("globus_pallidus.pt"))
         self.accumbens = NucleusAccumbens(input_dim, hidden_dim, device=device, persist_path=p("nucleus_accumbens.pt"))
         self.nigra = SubstantiaNigra(input_dim, hidden_dim, device=device, persist_path=p("substantia_nigra.pt"))
+        self.prev_action: torch.Tensor | None = None
         if self.persist_path and self.persist_path.exists():
             state = torch.load(self.persist_path, map_location=device)
             self.load_state_dict(state)
 
     @torch.no_grad()
     def gate(self, embedding: torch.Tensor) -> bool:
+        """Decide whether to produce a motor action for ``embedding``."""
+
         prob = float(self.net(embedding.to(self.device)))
         prob *= self.caudate.evaluate(embedding)
         prob *= self.putamen.facilitate(embedding)
@@ -72,6 +75,28 @@ class BasalGanglia(nn.Module):
             prob *= 1.0 - float(self.stn.inhibition(embedding))
         prob = max(0.0, min(1.0, prob))
         return prob > 0.25
+
+    @torch.no_grad()
+    def approve_action(self, action: torch.Tensor) -> bool:
+        """Return ``True`` if the proposed ``action`` should be executed."""
+
+        action = action.to(self.device)
+        prob = self.caudate.evaluate(action)
+        prob *= 1.0 - self.pallidus.brake(action)
+        prob += 0.2 * self.accumbens.reward_drive(action)
+        if self.prev_action is not None:
+            sim = torch.nn.functional.cosine_similarity(
+                action.view(-1), self.prev_action.to(self.device).view(-1), dim=0
+            ).item()
+            # High similarity triggers braking and additional inhibition
+            prob *= 1.0 - sim
+            if self.stn is not None:
+                prob *= 1.0 - sim * float(self.stn.inhibition(action))
+        prob = max(0.0, min(1.0, prob))
+        approved = prob > 0.25
+        if approved:
+            self.prev_action = action.detach().cpu()
+        return approved
 
     def save(self, path: str | None = None) -> None:
         target = path or self.persist_path
