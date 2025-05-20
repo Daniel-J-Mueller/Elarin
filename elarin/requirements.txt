@@ -14,3 +14,4 @@ pyyaml
 faiss-cpu
 pyzmq
 msgpack
+msgpack-numpy

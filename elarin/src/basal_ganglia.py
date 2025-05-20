@@ -4,6 +4,7 @@ import torch
 from torch import nn
 
 from .utils.sentinel import SentinelLinear
+from .subthalamic_nucleus import SubthalamicNucleus
 
 
 class BasalGanglia(nn.Module):
@@ -16,6 +17,7 @@ class BasalGanglia(nn.Module):
         device: str = "cpu",
         axis: "HypothalamusPituitaryAxis | None" = None,
         prefrontal: "PrefrontalCortex | None" = None,
+        stn: "SubthalamicNucleus | None" = None,
     ) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -27,6 +29,7 @@ class BasalGanglia(nn.Module):
         self.device = device
         self.axis = axis
         self.prefrontal = prefrontal
+        self.stn = stn
         self.to(device)
 
     @torch.no_grad()
@@ -39,5 +42,7 @@ class BasalGanglia(nn.Module):
         if self.prefrontal is not None:
             pf = float(self.prefrontal(embedding.to(self.prefrontal.device)))
             prob *= pf
+        if self.stn is not None:
+            prob *= 1.0 - float(self.stn.inhibition(embedding))
         prob = max(0.0, min(1.0, prob))
         return prob > 0.4

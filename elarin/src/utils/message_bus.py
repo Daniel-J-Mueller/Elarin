@@ -1,6 +1,10 @@
 import threading
 from typing import Callable, Dict
 
+import msgpack
+import msgpack_numpy
+import numpy as np
+
 import zmq
 
 
@@ -19,6 +23,11 @@ class MessageBus:
         """Broadcast ``data`` under ``topic``."""
         self.pub.send_multipart([topic.encode(), data])
 
+    def publish_array(self, topic: str, array: np.ndarray) -> None:
+        """Serialize and publish ``array`` using msgpack."""
+        packed = msgpack.dumps(array, default=msgpack_numpy.encode)
+        self.publish(topic, packed)
+
     def subscribe(self, topic: str, handler: Callable[[bytes], None]) -> None:
         """Listen on ``topic`` and invoke ``handler`` for each message."""
         sub = self.ctx.socket(zmq.SUB)
@@ -34,3 +43,11 @@ class MessageBus:
         t.start()
         self._subs[topic] = sub
         self._threads.append(t)
+
+    def subscribe_array(self, topic: str, handler: Callable[[np.ndarray], None]) -> None:
+        """Subscribe to a topic expecting msgpack arrays."""
+        def wrap(msg: bytes) -> None:
+            arr = msgpack.loads(msg, object_hook=msgpack_numpy.decode)
+            handler(arr)
+
+        self.subscribe(topic, wrap)

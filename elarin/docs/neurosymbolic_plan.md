@@ -9,7 +9,6 @@ This document outlines how we will evolve Elarin from the current single-model a
 - When possible, new models should share a common format (PyTorch `.pt` or NumPy `.npy`) to avoid additional loaders.
 - Reserve unusual sentinel values for untrained connections so that a region can skip processing them until reinforced.
 - Align neighbouring regions on the same GPU to minimise cross-device copies.
-- Launch scripts now pin each module to the appropriate GPU.
 
 ## 2. Region Allocation
 
@@ -25,8 +24,7 @@ We divide the system into smaller modules. For each area we define the approxima
 | Prefrontal Cortex & OFC     | Transformer (~10M)        | 2 |
 | Motor & Insular Cortex      | GPT‑2 half + projections (~60M) | 3 |
 
-This layout keeps sensory preprocessing together, while higher order decision and motor areas share GPUs to reduce latency between them.
-Launch scripts now enforce these assignments using ``CUDA_VISIBLE_DEVICES`` so each service starts on its designated card.
+This layout keeps sensory preprocessing together, while higher order decision and motor areas share GPUs to reduce latency between them. The run scripts already enforce these assignments using ``CUDA_VISIBLE_DEVICES``.
 
 ## 3. Bootstrapping Workflow
 
@@ -34,10 +32,8 @@ Launch scripts now enforce these assignments using ``CUDA_VISIBLE_DEVICES`` so e
 2. Load LoRA adapters from `elarin/persistent/` when available.
 3. During runtime the `trainer` service applies Hebbian updates continuously.
 4. If a weight value equals the sentinel (e.g. `-1e9`) skip the connection. When activity reinforces a path, replace the sentinel with a small positive weight.
-5. Each region now stores its own checkpoint in ``elarin/persistent/``.
-6. Valence embeddings and FAISS episodic recall are fully operational.
-7. Sentinel-aware layers keep inactive connections dormant until reinforced.
-8. Hippocampus snapshots use compressed ``.npz`` files for quicker reloads.
+5. Each region stores its own checkpoint in ``elarin/persistent/``.
+6. Adapter weights are written with msgpack for faster reloads.
 
 ## 4. Data Flow Updates
 
@@ -54,8 +50,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 ## 5. Next Steps
 
-- Expand the ZeroMQ ``MessageBus`` so sensors and cortex modules communicate asynchronously.
-- Evaluate additional persistence options (e.g. msgpack) to further reduce adapter load times.
-- Introduce a subthalamic nucleus module that slows action gating for difficult decisions.
+- Fine-tune the subthalamic nucleus inhibition threshold using reinforcement signals.
+- Connect sensors to cortex modules via the new asynchronous MessageBus channels.
+- Investigate distributed hippocampal training strategies.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
