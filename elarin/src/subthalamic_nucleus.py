@@ -28,6 +28,7 @@ class SubthalamicNucleus(nn.Module):
         self.device = device
         # threshold starts neutral and is nudged by ``reinforce`` calls
         self.threshold = 0.5
+        self.baseline = 0.0
         self.to(device)
 
     @torch.no_grad()
@@ -39,7 +40,9 @@ class SubthalamicNucleus(nn.Module):
         return max(0.0, min(1.0, level - self.threshold))
 
     @torch.no_grad()
-    def reinforce(self, reward: float, lr: float = 0.05) -> None:
-        """Update ``threshold`` given ``reward`` from amygdala feedback."""
-        self.threshold -= lr * reward
+    def reinforce(self, reward: float, lr: float = 0.05, beta: float = 0.1) -> None:
+        """Update ``threshold`` using moving-average baseline of ``reward``."""
+        self.baseline = (1 - beta) * self.baseline + beta * reward
+        adj = reward - self.baseline
+        self.threshold -= lr * adj
         self.threshold = max(0.0, min(1.0, float(self.threshold)))

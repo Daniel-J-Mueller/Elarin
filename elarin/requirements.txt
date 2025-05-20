@@ -1,10 +1,8 @@
 torch
 transformers
 huggingface-hub
-torchvision
 numpy
 pillow
-matplotlib
 opencv-python
 sounddevice
 pygame

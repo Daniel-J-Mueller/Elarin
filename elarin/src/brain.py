@@ -49,6 +49,7 @@ def main() -> None:
     audio_duration = float(settings.get("audio_duration", 1.0))
     debug_no_video = bool(settings.get("debug_no_video", False))
     hippocampus_capacity = int(settings.get("hippocampus_capacity", 1000))
+    recall_threshold = float(settings.get("hippocampus_recall_threshold", 0.0))
     motor_candidates = int(settings.get("motor_candidates", 1))
 
     if not persist_dir.is_absolute():
@@ -94,6 +95,7 @@ def main() -> None:
             "speech": 768,
         },
         capacity=hippocampus_capacity,
+        recall_threshold=recall_threshold,
         persist_path=f"{persist_dir}/hippocampus.npz",
     )
     amygdala = Amygdala(device=devices["dmn"])
@@ -249,6 +251,13 @@ def main() -> None:
                 intero = intero.to(dmn_device)
                 if intero.dim() == 3:
                     intero = intero.mean(dim=1)
+
+            # Executive filtering of sensations based on previous context
+            if prev_context is not None:
+                weights = pfc.filter_weights(prev_context)
+                vision = vision * weights["vision"]
+                audio = audio * weights["audio"]
+                intero = intero * weights["intero"]
 
             context = dmn(vision, audio, intero)
             context = corpus.transfer(context)
