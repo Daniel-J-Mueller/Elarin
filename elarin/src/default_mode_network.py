@@ -53,6 +53,16 @@ class DefaultModeNetwork(nn.Module):
         weighted_audio = audio * scale[1]
         weighted_intero = intero * scale[2]
         combined = torch.cat([weighted_vision, weighted_audio, weighted_intero], dim=-1)
+
+        expected = self.fusion.in_features
+        actual = combined.shape[-1]
+        if actual != expected:
+            if actual < expected:
+                pad = expected - actual
+                combined = nn.functional.pad(combined, (0, pad))
+            else:
+                combined = combined[..., :expected]
+
         # ``intero`` feedback may contain negative values intended to inhibit
         # repetition. ``ReLU`` would zero those out which defeats the purpose,
         # so use ``tanh`` here to preserve the sign while keeping the output
