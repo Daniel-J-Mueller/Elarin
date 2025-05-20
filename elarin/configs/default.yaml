@@ -20,7 +20,7 @@ models:
   gpt2: models/gpt2
 
 # Directory for saving learned state
-persistent_dir: persistent
+persistent_dir: /persistent
 log_dir: logs
 
 settings:
