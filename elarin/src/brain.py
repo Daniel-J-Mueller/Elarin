@@ -12,6 +12,7 @@ from .sensors.retina import Retina
 from .occipital_lobe import OccipitalLobe
 from .language_areas.wernickes_area import WernickesArea
 from .language_areas.augmenter import LanguageAugmenter
+from .insular_cortex import InsularCortex
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
@@ -77,6 +78,7 @@ def main() -> None:
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
     )
+    insula = InsularCortex(device=devices["motor_cortex"])
     motor = MotorCortex(
         models["gpt2"],
         wernicke,
@@ -210,13 +212,14 @@ def main() -> None:
             out_aug = cand_aug[best_idx : best_idx + 1]
             motor.learn_from_feedback(vision_feat, user_emb, cand_aug, trainer)
 
+            insula_emb = insula(out_aug)
             hippocampus.add_episode(
                 {
                     "vision": vision.squeeze(0).detach().cpu().numpy(),
                     "audio": audio.squeeze(0).detach().cpu().numpy(),
                     "intero": intero.squeeze(0).detach().cpu().numpy(),
                     "context": context.squeeze(0).detach().cpu().numpy(),
-                    "motor": out_aug.squeeze(0).detach().cpu().numpy(),
+                    "motor": insula_emb.squeeze(0).detach().cpu().numpy(),
                 }
             )
             motor_intero = insular(out_aug)
