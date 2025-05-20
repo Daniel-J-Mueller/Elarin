@@ -211,7 +211,8 @@ def main() -> None:
                     "motor": out_aug.squeeze(0).detach().cpu().numpy(),
                 }
             )
-            thalamus.submit("intero", out_aug)
+            filtered = axis.filter_intero(out_aug)
+            thalamus.submit("intero", filtered)
             trainer.step([dmn.fusion, augmenter], context)
             # Align DMN output with the embeddings of the speculative tokens so
             # future contexts better predict likely next words. ``Trainer.align``
@@ -241,7 +242,8 @@ def main() -> None:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
                 hippocampus.add_episode({"motor": teach_emb.squeeze(0).detach().cpu().numpy()})
-                thalamus.submit("intero", teach_emb)
+                filtered = axis.filter_intero(teach_emb)
+                thalamus.submit("intero", filtered)
                 trainer.step(
                     [dmn.fusion, motor.area.model.transformer, augmenter],
                     teach_emb,
