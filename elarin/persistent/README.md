@@ -1,5 +1,8 @@
-Persistent snapshots for memory and adapters.
+Persistent snapshots for memory and adapters. Each brain region writes its
+own learned weights here so progress can resume across sessions.
 
 Additional files:
 - ``token_embeddings.npy`` – semantic vectors for each tokenizer token
   (generate via ``python elarin/src/utils/token_table.py``)
+- ``semantic_flow.json`` & ``semantic_flow.npy`` – obsolete transition tables
+  from early experiments; safe to delete if present
