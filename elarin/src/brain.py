@@ -8,7 +8,6 @@ import numpy as np
 from pathlib import Path
 
 from .utils.message_bus import MessageBus
-from .sensors.speech_recognizer import SpeechRecognizer
 from .sensors.cochlea import Cochlea
 from .auditory_cortex import AuditoryCortex
 
@@ -150,9 +149,6 @@ def main() -> None:
     if not debug_no_video:
         cam = Camera()
         viewer = Viewer(224, 224)
-    speech_recognizer = SpeechRecognizer(
-        models["whisper"], device=devices.get("cochlea", "cpu")
-    )
     audio_buf = AudioBuffer(
         samplerate=16000, channels=1, buffer_seconds=audio_duration * 2
     )
@@ -201,8 +197,8 @@ def main() -> None:
             audio_feat = torch.zeros(1, 128, device=devices["auditory_cortex"])
             # Ignore near-silent audio to avoid hallucinated transcripts
             if audio_level > 0.02:
-                spoken = speech_recognizer.transcribe(audio_np)
                 audio_tensor = torch.from_numpy(audio_np).float().to(cochlea.device)
+                spoken = cochlea.transcribe(audio_tensor)
                 emb = cochlea.encode([audio_tensor])
                 audio_feat = auditory.process(emb)
                 if audio_feat.dim() == 3:
