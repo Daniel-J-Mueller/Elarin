@@ -121,6 +121,7 @@ def main() -> None:
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
     prev_context = None
+    prev_flow_emb = None
     silent_steps = 0
 
     cam = None
@@ -225,6 +226,11 @@ def main() -> None:
 
             context = dmn(vision, audio, intero)
 
+            context_np = context.squeeze(0).detach().cpu().numpy()
+            if prev_flow_emb is not None:
+                flow.observe_transition(prev_flow_emb, context_np)
+            prev_flow_emb = context_np
+
             if prev_context is None:
                 novelty = 1.0
             else:
@@ -241,6 +247,17 @@ def main() -> None:
                 context.view(-1), dislike_emb.view(-1), dim=0
             ).item()
             axis.update_valence(like_sim - dislike_sim)
+
+            pred_emb = flow.predict_next_embedding(context_np)
+            if pred_emb is not None:
+                pred_tensor = torch.tensor(pred_emb, device=dmn_device).unsqueeze(0)
+                p_like = torch.nn.functional.cosine_similarity(
+                    pred_tensor.view(-1), like_emb.view(-1), dim=0
+                ).item()
+                p_dis = torch.nn.functional.cosine_similarity(
+                    pred_tensor.view(-1), dislike_emb.view(-1), dim=0
+                ).item()
+                axis.update_valence(0.5 * (p_like - p_dis))
             prev_context = context.detach()
             recalled = hippocampus.query(
                 "context", context.squeeze(0).detach().cpu().numpy(), k=5
