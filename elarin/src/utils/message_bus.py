@@ -1,4 +1,5 @@
 import threading
+import time
 from typing import Callable, Dict
 
 import msgpack
@@ -18,10 +19,13 @@ class MessageBus:
         self.pub.bind(address)
         self._subs: Dict[str, zmq.Socket] = {}
         self._threads: list[threading.Thread] = []
+        self._count: Dict[str, int] = {}
+        self._start_time = time.time()
 
     def publish(self, topic: str, data: bytes) -> None:
         """Broadcast ``data`` under ``topic``."""
         self.pub.send_multipart([topic.encode(), data])
+        self._count[topic] = self._count.get(topic, 0) + 1
 
     def publish_array(self, topic: str, array: np.ndarray) -> None:
         """Serialize and publish ``array`` using msgpack."""
@@ -51,3 +55,12 @@ class MessageBus:
             handler(arr)
 
         self.subscribe(topic, wrap)
+
+    def get_rates(self) -> Dict[str, float]:
+        """Return messages per second for each topic since last call."""
+        now = time.time()
+        elapsed = max(now - self._start_time, 1e-6)
+        rates = {t: c / elapsed for t, c in self._count.items()}
+        self._count.clear()
+        self._start_time = now
+        return rates

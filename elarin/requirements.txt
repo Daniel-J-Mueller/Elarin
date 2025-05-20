@@ -7,7 +7,6 @@ pillow
 matplotlib
 opencv-python
 sounddevice
-openai-whisper
 pygame
 tqdm
 pyyaml
