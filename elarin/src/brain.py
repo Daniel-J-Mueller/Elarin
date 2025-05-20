@@ -16,6 +16,7 @@ from .insular_cortex import InsularCortex
 from .default_mode_network import DefaultModeNetwork
 from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
+from .insular_cortex import InsularCortex
 from .hippocampus import Hippocampus
 from .semantic_flow import SemanticFlow
 from .thalamus import Thalamus
@@ -70,6 +71,7 @@ def main() -> None:
         persist_path=f"{persist_dir}/hippocampus.npy",
     )
     axis = HypothalamusPituitaryAxis()
+    insular = InsularCortex().to(devices["dmn"])
     temporal = TemporalLobe()
     flow = SemanticFlow(len(wernicke.tokenizer), persist_path=f"{persist_dir}/semantic_flow.json")
     augmenter = LanguageAugmenter(
@@ -194,13 +196,13 @@ def main() -> None:
                 # Push other modalities back through the thalamus for replay
                 for modality in ("vision", "audio", "intero", "motor"):
                     if modality in recalled:
-                        sample = torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0)
+                        tensor_val = torch.tensor(recalled[modality], device=dmn_device).unsqueeze(0)
                         if modality == "motor":
-                            sample = insula(sample)
-                            sample = axis.filter_intero(sample)
-                            thalamus.submit("intero", sample)
+                            motor_intero = insular(tensor_val)
+                            filtered = axis.filter_intero(motor_intero)
+                            thalamus.submit("intero", filtered)
                         else:
-                            thalamus.submit(modality, sample)
+                            thalamus.submit(modality, tensor_val)
 
             out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
             flow.observe(wernicke.tokenizer.encode(out_text))
@@ -220,7 +222,8 @@ def main() -> None:
                     "motor": insula_emb.squeeze(0).detach().cpu().numpy(),
                 }
             )
-            filtered = axis.filter_intero(insula_emb)
+            motor_intero = insular(out_aug)
+            filtered = axis.filter_intero(motor_intero)
             thalamus.submit("intero", filtered)
             trainer.step([dmn.fusion, augmenter], context)
             # Align DMN output with the embeddings of the speculative tokens so
@@ -250,9 +253,9 @@ def main() -> None:
                 flow.observe(wernicke.tokenizer.encode(taught))
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
-                teach_insula = insula(teach_emb)
-                hippocampus.add_episode({"motor": teach_insula.squeeze(0).detach().cpu().numpy()})
-                filtered = axis.filter_intero(teach_insula)
+                hippocampus.add_episode({"motor": teach_emb.squeeze(0).detach().cpu().numpy()})
+                motor_intero = insular(teach_emb)
+                filtered = axis.filter_intero(motor_intero)
                 thalamus.submit("intero", filtered)
                 trainer.step(
                     [dmn.fusion, motor.area.model.transformer, augmenter],

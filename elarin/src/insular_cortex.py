@@ -1,21 +1,19 @@
-"""Transform motor outputs into interoceptive feedback."""
+"""Project motor embeddings into interoceptive space."""
+
+from __future__ import annotations
 
 import torch
 from torch import nn
 
 
 class InsularCortex(nn.Module):
-    """Projects motor embeddings into a damped interoceptive space."""
+    """Transforms motor cortex outputs before feedback."""
 
-    def __init__(self, embed_dim: int = 768, hidden_dim: int = 256, device: str = "cpu") -> None:
+    def __init__(self, in_dim: int = 768, intero_dim: int = 768) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, embed_dim),
-        )
-        self.device = device
-        self.to(device)
+        self.proj = nn.Linear(in_dim, intero_dim)
+        self.act = nn.Tanh()
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x.to(self.device))
+    @torch.no_grad()
+    def forward(self, motor_emb: torch.Tensor) -> torch.Tensor:
+        return self.act(self.proj(motor_emb))
