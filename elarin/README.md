@@ -2,8 +2,7 @@
 
 Elarin is an experiment in building an artificial "brain" composed of small,
 cooperating services. Each service emulates a specific brain region and operates
-on continuous embeddings rather than text tokens. The project is still in its
-infancy; many modules currently contain only scaffolding.
+on continuous embeddings rather than text tokens. The project is still in development.
 
 The high level layout mirrors how sensory information flows through the human
 brain. Sensors capture raw data which is encoded, routed through early sensory
@@ -90,17 +89,9 @@ compact 128-dimensional visual features.
 ## Development Notes
 
 Each brain region in `src/` will ultimately run as its own service. The scripts
-in `scripts/` are placeholders for launching these processes. The exact
-communication layer (likely ZeroMQ or Redis) and live-training dynamics are
-outlined in `AGENTS.md`.
-
-### Future Plans
-
-- Implement the IPC channels between regions.
-- Fill out the trainer logic for online LoRA updates and replay sampling.
-- Provide docker configuration for easier deployment.
-
-Elarin is a work in progress; contributions and experimentation are welcome.
+in `scripts/` are placeholders for launching these processes. The
+communication layer and live-training dynamics are
+outlined in `neurosymbolic_plan.md`.
 
 ### Running Elarin
 
