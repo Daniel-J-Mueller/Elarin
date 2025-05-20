@@ -44,7 +44,11 @@ def generate(
     model.to(device)
     model.eval()
 
-    embeddings = np.zeros((len(tokenizer), model.config.n_embd), dtype=np.float32)
+    # ``DataParallel`` wraps the model and hides the ``config`` attribute on the
+    # outer object. The underlying module retains the original ``config`` so we
+    # access it there when present.
+    emb_dim = model.module.config.n_embd if hasattr(model, "module") else model.config.n_embd
+    embeddings = np.zeros((len(tokenizer), emb_dim), dtype=np.float32)
     tokens = [tokenizer.decode([i], skip_special_tokens=False) for i in range(len(tokenizer))]
 
     with torch.no_grad():
