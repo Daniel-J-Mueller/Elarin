@@ -25,7 +25,6 @@ from .motor_cortex import MotorCortex
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .insular_cortex import InsularCortex
 from .hippocampus import Hippocampus
-from .semantic_flow import SemanticFlow
 from .thalamus import Thalamus
 from .trainer import Trainer
 from .temporal_lobe import TemporalLobe
@@ -104,9 +103,6 @@ def main() -> None:
         persist_path=f"{persist_dir}/insular.pt",
     )
     temporal = TemporalLobe()
-    flow = SemanticFlow(
-        len(wernicke.tokenizer), persist_path=f"{persist_dir}/semantic_flow.json"
-    )
     augmenter = LanguageAugmenter(
         device=devices["language_areas"],
         persist_path=f"{persist_dir}/angular_gyrus.pt",
@@ -131,7 +127,6 @@ def main() -> None:
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
     prev_context = None
-    prev_flow_emb = None
     silent_steps = 0
 
     cam = None
@@ -189,7 +184,6 @@ def main() -> None:
                 if audio_feat.dim() == 3:
                     audio_feat = audio_feat.mean(dim=1)
             if spoken:
-                flow.observe(wernicke.tokenizer.encode(spoken))
                 text_emb = wernicke.encode([spoken]).mean(dim=1)
                 temporal.clear()
             else:
@@ -238,9 +232,6 @@ def main() -> None:
             context = corpus.transfer(context)
 
             context_np = context.squeeze(0).detach().cpu().numpy()
-            if prev_flow_emb is not None:
-                flow.observe_transition(prev_flow_emb, context_np)
-            prev_flow_emb = context_np
 
             if prev_context is None:
                 novelty = 1.0
@@ -259,16 +250,7 @@ def main() -> None:
             ).item()
             axis.update_valence(like_sim - dislike_sim)
 
-            pred_emb = flow.predict_next_embedding(context_np)
-            if pred_emb is not None:
-                pred_tensor = torch.tensor(pred_emb, device=dmn_device).unsqueeze(0)
-                p_like = torch.nn.functional.cosine_similarity(
-                    pred_tensor.view(-1), like_emb.view(-1), dim=0
-                ).item()
-                p_dis = torch.nn.functional.cosine_similarity(
-                    pred_tensor.view(-1), dislike_emb.view(-1), dim=0
-                ).item()
-                axis.update_valence(0.5 * (p_like - p_dis))
+            # Prediction step using simple similarity to like/dislike prototypes
             prev_context = context.detach()
             recalled = hippocampus.query(
                 "context", context.squeeze(0).detach().cpu().numpy(), k=5
@@ -301,7 +283,6 @@ def main() -> None:
 
             if basal.gate(context):
                 out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(context)
-                flow.observe(wernicke.tokenizer.encode(out_text))
                 temporal.add_speculation(cand_texts)
                 temporal.consume(out_text)
                 cand_aug = augmenter(cand_embs)
@@ -373,7 +354,6 @@ def main() -> None:
             else:
                 taught = None
             if taught:
-                flow.observe(wernicke.tokenizer.encode(taught))
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
                 teach_val = amygdala.evaluate(teach_emb)
@@ -426,7 +406,6 @@ def main() -> None:
         hippocampus.save()
         motor.save()
         augmenter.save()
-        flow.save()
 
 
 if __name__ == "__main__":
