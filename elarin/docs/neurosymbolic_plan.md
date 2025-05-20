@@ -32,7 +32,7 @@ This layout keeps sensory preprocessing together, while higher order decision an
 2. Load LoRA adapters from `elarin/persistent/` when available.
 3. During runtime the `trainer` service applies Hebbian updates continuously.
 4. If a weight value equals the sentinel (e.g. `-1e9`) skip the connection. When activity reinforces a path, replace the sentinel with a small positive weight.
-5. Store per-region embeddings for phrases like “good” and “bad” in a table so later comparisons are trivial.
+5. Store per-region embeddings for phrases like “good” and “bad” in a table using ``utils/valence_table.py`` so later comparisons are trivial.
 
 ## 4. Data Flow Updates
 
@@ -51,8 +51,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 - Split existing monolithic checkpoints into per-region files.
 - Create placeholder MLP models for regions not yet implemented.
-- Define GPU affinity for every script in `scripts/` to honour the allocation table.
-- Generate a dataset of positive/negative valence phrases and store them under `elarin/persistent/valence.npy` for quick comparison.
+- Define GPU affinity for every script in `scripts/` to honour the allocation table. *(in progress)*
+- Integrate a FAISS-based recall index in the hippocampus for faster episodic queries.
 - Replace the repetitive “hereby” motor output by passing proposed tokens through the cerebellum and insular cortex before final emission.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

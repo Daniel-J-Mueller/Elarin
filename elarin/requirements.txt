@@ -10,3 +10,4 @@ sounddevice
 openai-whisper
 pygame
 tqdm
+pyyaml
