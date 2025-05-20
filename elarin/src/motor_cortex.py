@@ -103,6 +103,7 @@ class MotorCortex:
         n = num_candidates if num_candidates is not None else self.num_candidates
 
         # Apply adaptive dampening to the hidden state
+        hidden = hidden.to(self.device)
         hidden = hidden + self.damp_lora(hidden)
 
         if self.wernicke.token_table is not None:
