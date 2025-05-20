@@ -189,6 +189,8 @@ def main() -> None:
                 intero = torch.zeros(1, 768, device=dmn_device)
             else:
                 intero = intero.to(dmn_device)
+                if intero.dim() == 3:
+                    intero = intero.mean(dim=1)
 
             context = dmn(vision, audio, intero)
             recalled = hippocampus.query(
@@ -243,21 +245,6 @@ def main() -> None:
                 ],
                 context,
             )
-            # Align DMN output with the embeddings of the speculative tokens so
-            # future contexts better predict likely next words. ``Trainer.align``
-            # updates parameters to make ``actual`` closer to ``target``. Each
-            # candidate embedding acts as a desired target while the DMN context
-            # serves as the current prediction.
-            for emb in cand_aug:
-                # ``cand_aug`` has shape ``(num_candidates, seq_len, hidden)``.
-                # Align each token separately to preserve detailed feedback.
-                for tok in emb:
-                    tok = tok.unsqueeze(0)
-                    trainer.align(
-                        [dmn.fusion, motor.area.model.transformer, augmenter],
-                        tok,
-                        context,
-                    )
 
             hippocampus.decay()
 
