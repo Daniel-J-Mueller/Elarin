@@ -3,6 +3,7 @@
 import torch
 from torch import nn
 from pathlib import Path
+import time
 
 from .utils.sentinel import SentinelLinear
 from .subthalamic_nucleus import SubthalamicNucleus
@@ -50,13 +51,32 @@ class BasalGanglia(nn.Module):
         self.accumbens = NucleusAccumbens(input_dim, hidden_dim, device=device, persist_path=p("nucleus_accumbens.pt"))
         self.nigra = SubstantiaNigra(input_dim, hidden_dim, device=device, persist_path=p("substantia_nigra.pt"))
         self.prev_action: torch.Tensor | None = None
+        self.last_output_time = 0.0
+        self.feedback_pending = False
+        self.last_rating = 0.0
+        self.feedback_timeout = 2.0
         if self.persist_path and self.persist_path.exists():
             state = torch.load(self.persist_path, map_location=device)
             self.load_state_dict(state)
 
+    def register_output(self) -> None:
+        """Record that a motor action was produced."""
+
+        self.last_output_time = time.time()
+        self.feedback_pending = True
+        self.last_rating = 0.0
+
+    def register_feedback(self, rating: int) -> None:
+        """Note user feedback on the last action."""
+
+        self.feedback_pending = False
+        self.last_rating = float(rating) / 5.0
+
     @torch.no_grad()
     def gate(self, embedding: torch.Tensor) -> bool:
         """Decide whether to produce a motor action for ``embedding``."""
+        if self.feedback_pending and time.time() - self.last_output_time < self.feedback_timeout:
+            return False
 
         prob = float(self.net(embedding.to(self.device)))
         prob *= self.caudate.evaluate(embedding)
@@ -77,6 +97,7 @@ class BasalGanglia(nn.Module):
             prob *= pf
         if self.stn is not None:
             prob *= 1.0 - float(self.stn.inhibition(embedding))
+        prob += 0.1 * self.last_rating
         prob = max(0.0, min(1.0, prob))
         return prob > 0.25
 
@@ -96,6 +117,7 @@ class BasalGanglia(nn.Module):
             prob *= 1.0 - sim
             if self.stn is not None:
                 prob *= 1.0 - sim * float(self.stn.inhibition(action))
+        prob += 0.05 * self.last_rating
         prob = max(0.0, min(1.0, prob))
         approved = prob > 0.25
         if approved:

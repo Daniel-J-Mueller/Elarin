@@ -405,6 +405,7 @@ def main(argv: list[str] | None = None) -> None:
         persist_path=f"{persist_dir}/motor_cortex_generator.pt",
         num_candidates=motor_candidates,
         feedback_buffer=training_buffer,
+        basal=basal,
     )
     maybe_initialize(
         motor,
@@ -654,6 +655,7 @@ def main(argv: list[str] | None = None) -> None:
                     motor.learn_from_feedback(
                         vision_feat, user_emb, cand_aug, trainer
                     )
+                    basal.register_output()
                 pred_vals = predict_fn(cand_embs)
                 if pred_vals.numel() > best_idx and pred_vals[best_idx] > 0:
                     axis.update_valence(float(pred_vals[best_idx]))

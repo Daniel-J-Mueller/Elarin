@@ -76,5 +76,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   ratings are provided via clickable buttons.
 - Increase basal ganglia gating when norepinephrine or serotonin is high so the
   system vocalises when distressed and learns from early feedback.
+- Delay further motor output until ratings are received or a short timeout
+  expires so the system can associate feedback with the correct response.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
