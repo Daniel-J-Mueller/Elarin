@@ -13,6 +13,7 @@ from .utils.adapters import FatigueLoRA, LongTermLoRA
 from .utils.sentinel import SentinelLinear
 from .utils.curiosity import CuriosityTracker
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
+from .basal_ganglia import BasalGanglia
 from .trainer import Trainer
 from .utils.logger import get_logger
 
@@ -29,6 +30,7 @@ class MotorCortex(nn.Module):
         persist_path: str | None = None,
         num_candidates: int = 1,
         feedback_buffer: float = 30.0,
+        basal: "BasalGanglia | None" = None,
     ) -> None:
         super().__init__()
         self.logger = get_logger("motor_cortex")
@@ -50,6 +52,7 @@ class MotorCortex(nn.Module):
         self.curiosity = CuriosityTracker()
         self._trainer = Trainer()
         self.feedback_buffer = float(feedback_buffer)
+        self.basal = basal
         self._recent = deque()  # (timestamp, token_id, context, token_emb)
         if persist_path and Path(persist_path).exists():
             state = torch.load(persist_path, map_location=device)
@@ -73,6 +76,10 @@ class MotorCortex(nn.Module):
     @torch.no_grad()
     def reinforce_output(self, rating: int, token_id: int) -> None:
         """Strengthen or weaken the association for ``token_id``."""
+        if self.basal is not None:
+            self.basal.register_feedback(rating)
+        if self.axis is not None:
+            self.axis.update_valence(float(rating) / 5.0)
         if not self._recent or rating == 0:
             return
         entry = None
