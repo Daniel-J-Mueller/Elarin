@@ -1,6 +1,6 @@
 """Utility for visualizing what Elarin sees using PyGame."""
 
-from typing import Optional
+from typing import Optional, Tuple
 import numpy as np
 import pygame
 
@@ -26,6 +26,9 @@ class Viewer:
         pygame.display.set_caption("Elarin Viewer")
         self.font = pygame.font.SysFont(None, 24)
         self.input_buffer = ""
+        self.treat_rect = pygame.Rect(
+            self.width - 70, self.height + 5, 65, self.bar_height - 10
+        )
 
     def update(self, frame: np.ndarray, text: str = "", audio_level: float = 0.0) -> None:
         surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
@@ -56,18 +59,25 @@ class Viewer:
             (0, 255, 0),
             (self.width - 15, self.height + meter_h - level + 5, 10, level),
         )
+        pygame.draw.rect(self.screen, (255, 165, 0), self.treat_rect)
+        label = self.font.render("Treat", True, (0, 0, 0))
+        self.screen.blit(label, (self.treat_rect.x + 5, self.treat_rect.y))
         pygame.display.flip()
         pygame.event.pump()
 
     def close(self) -> None:
         pygame.quit()
 
-    def poll_text_input(self) -> Optional[str]:
-        """Return entered text when the user presses Enter."""
+    def poll_text_input(self) -> Tuple[Optional[str], bool]:
+        """Return entered text and whether the treat button was clicked."""
         submitted: Optional[str] = None
+        treat = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 raise KeyboardInterrupt
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.treat_rect.collidepoint(event.pos):
+                    treat = True
             if event.type != pygame.KEYDOWN:
                 continue
 
@@ -80,4 +90,4 @@ class Viewer:
                 if event.unicode and len(event.unicode) == 1 and ord(event.unicode) >= 32:
                     self.input_buffer += event.unicode
 
-        return submitted
+        return submitted, treat

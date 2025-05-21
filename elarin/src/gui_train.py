@@ -165,8 +165,9 @@ class GUITrain(logging.Handler):
         pygame.display.flip()
         pygame.event.pump()
 
-    def poll_text_input(self) -> Optional[str]:
+    def poll_text_input(self) -> tuple[Optional[str], bool]:
         submitted: Optional[str] = None
+        treat = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -194,7 +195,7 @@ class GUITrain(logging.Handler):
                     if rect.collidepoint(x, y):
                         self.selected = idx
         self.draw()
-        return submitted
+        return submitted, treat
 
     def apply_rating(self, rating: int) -> None:
         if not self.log or not (0 <= self.selected < len(self.log)):
