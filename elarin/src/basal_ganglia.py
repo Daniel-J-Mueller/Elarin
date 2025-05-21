@@ -66,7 +66,11 @@ class BasalGanglia(nn.Module):
         prob += 0.2 * self.nigra.initiate(embedding)
         # Modulate gating probability using hormone levels if available
         if self.axis is not None:
-            mod = 0.5 * float(self.axis.dopamine) - 0.3 * float(self.axis.serotonin)
+            mod = (
+                0.5 * float(self.axis.dopamine)
+                + 0.2 * float(self.axis.norepinephrine)
+                + 0.1 * float(self.axis.serotonin)
+            )
             prob += mod
         if self.prefrontal is not None:
             pf = float(self.prefrontal(embedding.to(self.prefrontal.device)))

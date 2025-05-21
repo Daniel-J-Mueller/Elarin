@@ -667,9 +667,10 @@ def main(argv: list[str] | None = None) -> None:
                 silent_steps = 0
             else:
                 silent_steps += 1
-                if silent_steps > 20:
-                    axis.dopamine = min(1.0, axis.dopamine + 0.2)
-                    silent_steps = 10
+                if silent_steps > 10:
+                    axis.dopamine = min(1.0, axis.dopamine + 0.3)
+                    axis.serotonin = max(0.0, axis.serotonin - 0.05)
+                    silent_steps = 5
 
             insula_emb = insula(out_aug)
             valence = amygdala.evaluate(context)
