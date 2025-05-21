@@ -14,7 +14,7 @@ from .trainer import Trainer
 from .utils.logger import get_logger
 
 
-class MotorCortex:
+class MotorCortex(nn.Module):
     """Generates text from context embeddings and prints it."""
 
     def __init__(
@@ -26,6 +26,7 @@ class MotorCortex:
         persist_path: str | None = None,
         num_candidates: int = 1,
     ) -> None:
+        super().__init__()
         self.logger = get_logger("motor_cortex")
         self.area = BrocasArea(model_dir, device=device)
         self.wernicke = wernicke
@@ -56,6 +57,29 @@ class MotorCortex:
         self.history: list[int] = []
         self.history_size = 50
         self.repetition_penalty = 1.2
+
+    def modules(self):
+        """Yield child modules for initialization."""
+        for m in (self.area.model, self.vision_to_text, self.damp_lora, self.long_lora):
+            yield m
+
+    # enable loading via :func:`maybe_initialize`
+    def load_state_dict(self, state: dict, strict: bool = False):
+        self.area.model.load_state_dict(state.get("broca", {}), strict=strict)
+        self.vision_to_text.load_state_dict(state.get("vision_to_text", {}), strict=strict)
+        self.damp_lora.load_state_dict(state.get("damp_lora", {}), strict=strict)
+        self.long_lora.load_state_dict(state.get("long_lora", {}), strict=strict)
+        if "curiosity" in state:
+            self.curiosity.load_state_dict(state["curiosity"])
+
+    def state_dict(self):
+        return {
+            "broca": self.area.model.state_dict(),
+            "vision_to_text": self.vision_to_text.state_dict(),
+            "damp_lora": self.damp_lora.state_dict(),
+            "long_lora": self.long_lora.state_dict(),
+            "curiosity": self.curiosity.state_dict(),
+        }
         
     def save(self, path: str | None = None) -> None:
         """Save adapter parameters for later reloading."""
