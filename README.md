@@ -115,7 +115,12 @@ cortex generates each step. Increasing this value trains on multiple
 possible outputs while only printing the highest-probability token.
 ``neurogenesis`` can also be enabled to automatically seed blank region
 weights using Kaiming initialization whenever no trained parameters are
-found.
+found. This option is primarily useful the first time you run Elarin or
+after deleting the ``persistent/`` directory. Once weights have been
+initialized, leaving ``neurogenesis`` enabled is harmless&mdash;it will only
+affect regions whose checkpoint files are missing or contain all zeros.
+If you prefer, you can disable the flag after the initial launch and
+restart Elarin normally.
 
 All learned memories and adapter weights are automatically written to the
 ``elarin/persistent/`` directory so progress can be resumed on the next

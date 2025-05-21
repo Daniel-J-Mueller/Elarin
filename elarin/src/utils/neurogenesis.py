@@ -43,19 +43,24 @@ def _record_birth(name: str, state_file: Path) -> None:
     state_file.write_text(json.dumps(state))
 
 
-def _init_module(module: nn.Module, bias_shift: float = 0.0, var_scale: float = 1.0) -> None:
-    for m in module.modules():
-        if isinstance(m, nn.Linear):
-            nn.init.kaiming_normal_(m.weight)
-            m.weight.mul_(var_scale)
-            m.weight.add_(torch.randn_like(m.weight) * 0.01)
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
-                if bias_shift:
-                    m.bias.data.add_(bias_shift)
-        if hasattr(m, "A") and hasattr(m, "B"):
-            nn.init.normal_(m.A, std=0.02)
-            nn.init.normal_(m.B, std=0.02)
+def _init_module(
+    module: nn.Module, bias_shift: float = 0.0, var_scale: float = 1.0
+) -> None:
+    """Initialize parameters of ``module`` using Kaiming initialization."""
+
+    with torch.no_grad():
+        for m in module.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+                m.weight.mul_(var_scale)
+                m.weight.add_(torch.randn_like(m.weight) * 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+                    if bias_shift:
+                        m.bias.add_(bias_shift)
+            if hasattr(m, "A") and hasattr(m, "B"):
+                nn.init.normal_(m.A, std=0.02)
+                nn.init.normal_(m.B, std=0.02)
 
 
 def maybe_initialize(
