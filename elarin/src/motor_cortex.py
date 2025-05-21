@@ -3,6 +3,8 @@
 import torch
 from torch import nn
 from pathlib import Path
+import time
+from collections import deque
 
 from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
@@ -25,6 +27,7 @@ class MotorCortex(nn.Module):
         axis: HypothalamusPituitaryAxis | None = None,
         persist_path: str | None = None,
         num_candidates: int = 1,
+        feedback_buffer: float = 30.0,
     ) -> None:
         super().__init__()
         self.logger = get_logger("motor_cortex")
@@ -44,6 +47,9 @@ class MotorCortex(nn.Module):
             device=device,
         )
         self.curiosity = CuriosityTracker()
+        self._trainer = Trainer()
+        self.feedback_buffer = float(feedback_buffer)
+        self._recent = deque()  # (timestamp, token_id, context, token_emb)
         if persist_path and Path(persist_path).exists():
             state = torch.load(persist_path, map_location=device)
             self.area.model.load_state_dict(state.get("broca", {}), strict=False)
@@ -57,6 +63,33 @@ class MotorCortex(nn.Module):
         self.history: list[int] = []
         self.history_size = 50
         self.repetition_penalty = 1.2
+
+    def _trim_recent(self) -> None:
+        cutoff = time.time() - self.feedback_buffer
+        while self._recent and self._recent[0][0] < cutoff:
+            self._recent.popleft()
+
+    @torch.no_grad()
+    def reinforce_output(self, rating: int, token_id: int) -> None:
+        """Strengthen or weaken the association for ``token_id``."""
+        if not self._recent or rating == 0:
+            return
+        entry = None
+        for ts, tid, ctx, emb in reversed(self._recent):
+            if tid == token_id:
+                entry = (ctx, emb)
+                break
+        if entry is None:
+            return
+        ctx, emb = entry
+        scale = abs(float(rating)) / 5.0
+        target = emb.to(self.device) if rating > 0 else torch.zeros_like(emb)
+        self._trainer.align(
+            [self.area.model.transformer, self.damp_lora, self.long_lora],
+            ctx.to(self.device),
+            target,
+            lr_scale=scale,
+        )
 
     def modules(self):
         """Yield child modules for initialization."""
@@ -203,8 +236,10 @@ class MotorCortex(nn.Module):
                 self.history.pop(0)
             self.curiosity.update(tok_id)
 
-        self.logger.info(best_text)
+        self.logger.info(best_text, extra={"token_id": tok_id})
         chosen_emb = enc[best_idx : best_idx + 1]
+        self._recent.append((time.time(), tok_id, hidden.detach().cpu(), chosen_emb.detach().cpu()))
+        self._trim_recent()
         return best_text, chosen_emb, enc, best_idx, texts
 
     @torch.no_grad()

@@ -6,6 +6,7 @@ import time
 import cv2
 import numpy as np
 from pathlib import Path
+import argparse
 
 from .utils.message_bus import MessageBus
 from .sensors.cochlea import Cochlea
@@ -44,14 +45,19 @@ from .pons import Pons
 from .medulla_oblongata import MedullaOblongata
 from .pituitary_gland import PituitaryGland
 from .utils.config import load_config, BASE_DIR
-from .utils.logger import get_logger, enable_file_logging
+from .utils.logger import get_logger, enable_file_logging, install_handler
+from .terminal_gui import TerminalGUI
 from .viewer import Viewer
 from .utils.camera import Camera
 from .utils.audio_buffer import AudioBuffer
 from .utils.neurogenesis import maybe_initialize
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run Elarin brain")
+    parser.add_argument("--tui", action="store_true", help="enable terminal UI")
+    args = parser.parse_args(argv)
+
     cfg = load_config("configs/default.yaml")
     devices = cfg["devices"]
     models = cfg["models"]
@@ -70,6 +76,7 @@ def main() -> None:
     motor_candidates = int(settings.get("motor_candidates", 1))
     log_to_file = bool(settings.get("log_to_file", False))
     neurogenesis = bool(settings.get("neurogenesis", False))
+    training_buffer = float(settings.get("training_buffer", 30))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -387,6 +394,7 @@ def main() -> None:
         axis=axis,
         persist_path=f"{persist_dir}/motor_cortex_generator.pt",
         num_candidates=motor_candidates,
+        feedback_buffer=training_buffer,
     )
     maybe_initialize(
         motor,
@@ -399,6 +407,11 @@ def main() -> None:
 
     thalamus = Thalamus()
     trainer = Trainer()
+    gui = None
+    if args.tui:
+        gui = TerminalGUI(motor, buffer_seconds=training_buffer)
+        gui.start()
+        install_handler(gui)
 
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
@@ -419,6 +432,10 @@ def main() -> None:
     try:
         while True:
             step += 1
+            if gui:
+                gui.handle_input()
+                if not gui.running:
+                    break
             # Adjust sensory modality weights based on hormone levels
             vis_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
             aud_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
@@ -531,6 +548,8 @@ def main() -> None:
 
             context_np = context.squeeze(0).detach().cpu().numpy()
             bus.publish("context", context_np.tobytes())
+            if gui:
+                gui.add_context(context.detach())
 
             if prev_context is None:
                 novelty = 1.0
@@ -816,6 +835,8 @@ def main() -> None:
             cam.release()
         if viewer:
             viewer.close()
+        if gui:
+            gui.stop()
         audio_buf.close()
         insular.save()
         insula.save()
