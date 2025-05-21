@@ -1,9 +1,18 @@
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 
 _file_handler: Optional[logging.Handler] = None
+_extra_handlers: List[logging.Handler] = []
+
+
+def install_handler(handler: logging.Handler) -> None:
+    """Attach ``handler`` to all existing loggers and future ones."""
+    _extra_handlers.append(handler)
+    logging.getLogger().addHandler(handler)
+    for name in logging.Logger.manager.loggerDict.keys():
+        logging.getLogger(name).addHandler(handler)
 
 
 def enable_file_logging(log_dir: str) -> None:
@@ -31,5 +40,7 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         logger.addHandler(handler)
         if _file_handler:
             logger.addHandler(_file_handler)
+        for h in _extra_handlers:
+            logger.addHandler(h)
         logger.setLevel(level)
     return logger

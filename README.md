@@ -71,9 +71,12 @@ The script downloads the following models sequentially:
    the motor cortex output.  The window updates continuously until you
    interrupt the program with ``Ctrl+C``:
 
-   ```bash
-   python -m elarin.src.brain
-   ```
+  ```bash
+  python -m elarin.src.brain
+  ```
+
+   Pass ``--tui`` to launch the experimental terminal interface for rating
+   motor cortex responses instead of plain logging.
 
    Alternatively, you can run `./scripts/run_brain.sh` which performs the
    same action with the proper `PYTHONPATH` configured.
