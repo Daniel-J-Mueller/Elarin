@@ -620,8 +620,22 @@ def main(argv: list[str] | None = None) -> None:
                                 thalamus.submit(modality, tensor_val)
 
             if basal.gate(context):
+                def predict_fn(embs: torch.Tensor) -> torch.Tensor:
+                    aug = augmenter(embs)
+                    vals = []
+                    for e in aug:
+                        mem = hippocampus.query(
+                            "speech", e.squeeze(0).detach().cpu().numpy()
+                        )
+                        val = float(mem.get("valence", 0.0))
+                        if val == 0.0:
+                            val = amygdala.evaluate(e.unsqueeze(0))
+                        vals.append(val)
+                    return torch.tensor(vals, device=embs.device)
+
                 out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(
-                    context
+                    context,
+                    valence_fn=predict_fn,
                 )
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
@@ -640,9 +654,12 @@ def main(argv: list[str] | None = None) -> None:
                     motor.learn_from_feedback(
                         vision_feat, user_emb, cand_aug, trainer
                     )
+                pred_vals = predict_fn(cand_embs)
+                if pred_vals.numel() > best_idx and pred_vals[best_idx] > 0:
+                    axis.update_valence(float(pred_vals[best_idx]))
                 else:
                     out_text = ""
-                    out_aug = torch.zeros(1, 768, device=devices["motor_cortex"]) 
+                    out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])
             else:
                 out_text = ""
                 out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])

@@ -129,6 +129,12 @@ affect regions whose checkpoint files are missing or contain all zeros.
 If you prefer, you can disable the flag after the initial launch and
 restart Elarin normally.
 
+The motor cortex now predicts the likely valence of each speculative
+token using hippocampal recall and the amygdala before choosing which
+one to emit. When a predicted outcome appears favourable the
+``HypothalamusPituitaryAxis`` receives a small dopamine boost which makes
+execution of that token more likely.
+
 All learned memories and adapter weights are automatically written to the
 ``elarin/persistent/`` directory so progress can be resumed on the next
 launch. Removing that directory resets the brain back to its initial

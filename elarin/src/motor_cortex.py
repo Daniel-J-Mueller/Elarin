@@ -5,6 +5,7 @@ from torch import nn
 from pathlib import Path
 import time
 from collections import deque
+from typing import Callable
 
 from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
@@ -136,7 +137,8 @@ class MotorCortex(nn.Module):
         hidden: torch.Tensor,
         temperature: float | None = None,
         num_candidates: int | None = None,
-    ) -> tuple[str, torch.Tensor, torch.Tensor, int]:
+        valence_fn: "Callable[[torch.Tensor], torch.Tensor] | None" = None,
+    ) -> tuple[str, torch.Tensor, torch.Tensor, int, list[str]]:
         """Return the token whose embedding best matches ``hidden``.
 
         When the precomputed token table is available, similarity against the
@@ -156,6 +158,10 @@ class MotorCortex(nn.Module):
         num_candidates:
             Number of speculative tokens to generate.  When ``None`` the
             ``MotorCortex`` instance's ``num_candidates`` value is used.
+        valence_fn:
+            Optional callable that receives the candidate embeddings and
+            returns predicted valence scores.  The scores are added to the
+            similarity measure when selecting the final token.
         Returns
         -------
         tuple
@@ -200,8 +206,12 @@ class MotorCortex(nn.Module):
             ids = topk.indices.tolist()
             texts = [self.wernicke.tokenizer.decode([i], skip_special_tokens=True) for i in ids]
             enc = table[ids].unsqueeze(1)
-            best_idx = 0
-            best_text = texts[0]
+            scores = topk.values
+            if valence_fn is not None:
+                val = valence_fn(enc)
+                scores = scores + val
+            best_idx = int(torch.argmax(scores).item())
+            best_text = texts[best_idx]
         else:
             # Fall back to sampling via Broca's area when no table is available
             candidates = list(
@@ -225,7 +235,11 @@ class MotorCortex(nn.Module):
                 self.curiosity.bonus(tid) for tid in ids
             ], device=sims.device)
             sims = sims * (1.0 + curiosity_bonus)
-            best_idx = int(torch.argmax(sims).item())
+            scores = sims
+            if valence_fn is not None:
+                val = valence_fn(enc)
+                scores = scores + val
+            best_idx = int(torch.argmax(scores).item())
             best_text = texts[best_idx]
 
         # update history of produced tokens
