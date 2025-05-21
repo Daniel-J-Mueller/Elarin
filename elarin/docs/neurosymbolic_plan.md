@@ -74,5 +74,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   Kaiming-initialized parameters and tracks which modules have been born.
 - Refine the new PyGame training GUI so errors display in a dedicated pane and
   ratings are provided via clickable buttons.
+- Increase basal ganglia gating when norepinephrine or serotonin is high so the
+  system vocalises when distressed and learns from early feedback.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
