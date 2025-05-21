@@ -45,8 +45,14 @@ from .pons import Pons
 from .medulla_oblongata import MedullaOblongata
 from .pituitary_gland import PituitaryGland
 from .utils.config import load_config, BASE_DIR
-from .utils.logger import get_logger, enable_file_logging, install_handler
-from .terminal_gui import TerminalGUI
+import logging
+from .utils.logger import (
+    get_logger,
+    enable_file_logging,
+    install_handler,
+    set_stdout_level,
+)
+from .gui_train import GUITrain
 from .viewer import Viewer
 from .utils.camera import Camera
 from .utils.audio_buffer import AudioBuffer
@@ -55,7 +61,11 @@ from .utils.neurogenesis import maybe_initialize
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Run Elarin brain")
-    parser.add_argument("--tui", action="store_true", help="enable terminal UI")
+    parser.add_argument(
+        "--gui_train",
+        action="store_true",
+        help="enable PyGame training interface",
+    )
     args = parser.parse_args(argv)
 
     cfg = load_config("configs/default.yaml")
@@ -408,10 +418,10 @@ def main(argv: list[str] | None = None) -> None:
     thalamus = Thalamus()
     trainer = Trainer()
     gui = None
-    if args.tui:
-        gui = TerminalGUI(motor, buffer_seconds=training_buffer)
-        gui.start()
+    if args.gui_train:
+        gui = GUITrain(motor, buffer_seconds=training_buffer)
         install_handler(gui)
+        set_stdout_level(logging.WARNING)
 
     logger.info("starting live loop; press Ctrl+C to stop")
     dmn_device = devices["dmn"]
@@ -422,6 +432,9 @@ def main(argv: list[str] | None = None) -> None:
     viewer = None
     if not debug_no_video:
         cam = Camera()
+    if args.gui_train:
+        viewer = gui
+    elif not debug_no_video:
         viewer = Viewer(224, 224)
     audio_buf = AudioBuffer(
         samplerate=16000, channels=1, buffer_seconds=audio_duration * 2
@@ -432,10 +445,6 @@ def main(argv: list[str] | None = None) -> None:
     try:
         while True:
             step += 1
-            if gui:
-                gui.handle_input()
-                if not gui.running:
-                    break
             # Adjust sensory modality weights based on hormone levels
             vis_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
             aud_w = 1.4 + 0.4 * axis.dopamine - 0.2 * axis.serotonin
@@ -835,8 +844,6 @@ def main(argv: list[str] | None = None) -> None:
             cam.release()
         if viewer:
             viewer.close()
-        if gui:
-            gui.stop()
         audio_buf.close()
         insular.save()
         insula.save()

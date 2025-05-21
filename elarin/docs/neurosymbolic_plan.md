@@ -71,5 +71,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
 - Introduce a curiosity-driven intrinsic motivation module so unexplored tokens receive a small bonus during selection.
 - Add a ``neurogenesis`` bootstrapping step that seeds any zero-weight region with
   Kaiming-initialized parameters and tracks which modules have been born.
+- Refine the new PyGame training GUI so errors display in a dedicated pane and
+  ratings are provided via clickable buttons.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

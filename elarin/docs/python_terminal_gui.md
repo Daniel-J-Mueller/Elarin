@@ -1,6 +1,8 @@
-# Terminal GUI Plan
+# PyGame Training GUI
 
-This document outlines how to evolve the simple STDOUT logging into a usable terminal interface for monitoring and rating Elarin's motor cortex output.  The overall goal is to keep the interface text‑only so it can run in any terminal while still supporting interaction.
+This document describes the small graphical interface used for monitoring and
+rating Elarin's motor cortex output. It replaces the early text-only terminal
+concept with a PyGame window that integrates logging and feedback controls.
 
 ## Goals
 
@@ -15,7 +17,9 @@ This document outlines how to evolve the simple STDOUT logging into a usable ter
 
 ## Design
 
-The interface will be implemented with Python's `curses` module so no extra dependencies are required.  It divides the terminal into two panes:
+The interface now uses PyGame and expands the existing viewer window. A small
+error bar spans the top while the main frame sits below it. A column of rating
+buttons and a text input box appear on the right:
 
 ```
 ┌──────────────────────────────────────┐┌─────────────────────┐
@@ -33,11 +37,15 @@ A custom `logging.Handler` will capture messages from the `motor_cortex` logger.
 
 ### Scrollable Output
 
-The left pane uses a `curses` pad so older messages can be scrolled with the arrow keys or PgUp/PgDn.  A status bar at the bottom shows the current position.  New entries automatically scroll into view unless the user has scrolled back.
+Recent motor cortex messages are listed on the left. Older entries automatically
+scroll off screen with the newest lines always visible.
 
 ### Rating Bar
 
-When a log entry is highlighted, a vertical bar of buttons from -5 to 5 appears.  Colours range from purple (negative) through blue to light cyan (positive).  Pressing a number triggers `MotorCortex.reinforce_output(rating, token_id)` which will be added as a new method.  Positive values strengthen the pathways that produced the token while negative values weaken them.
+A vertical column of clickable buttons from -5 to 5 appears on the right.  Each
+click immediately calls ``MotorCortex.reinforce_output`` with the selected
+rating for the latest token. Negative numbers weaken that output while positive
+numbers reinforce it.
 
 ### Correction Input
 
@@ -49,13 +57,17 @@ Ratings and corrections are appended to `persistent/cli_feedback.log` so future 
 
 ## Integration
 
-* `brain.py` gains an optional `--tui` flag.  When enabled it starts the `TerminalGUI` instead of printing raw log lines.  The rest of the brain loop remains unchanged.
-* `utils/logger.py` exposes `install_handler(handler)` so the GUI can hook into existing loggers without rewriting them.
-* A new module `terminal_gui.py` implements the curses interface and the reinforcement helpers.
-* The run script `run_brain.sh` will accept `--tui` and forward it to `brain.py`.
+* `brain.py` now accepts `--gui_train`. When enabled it expands the PyGame
+  viewer and attaches the `GUITrain` handler so informational logs,
+  rating buttons and text input appear inside the window.
+* `utils/logger.py` exposes `install_handler(handler)` so the GUI can hook into
+  existing loggers without rewriting them. The new `set_stdout_level()` helper
+  hides everything below ``WARNING`` on the terminal while the GUI is active.
+* The run script `run_brain.sh` will accept `--gui_train` and forward it to
+  `brain.py`.
 
 ## Future Improvements
 
-* Replace the basic curses interface with the richer `textual` library once extra dependencies are permitted.
+* Consider migrating the PyGame layout to a richer UI toolkit once extra dependencies are permitted.
 * Add search/filter controls for long sessions.
 * Visualise hormone levels and novelty metrics in additional panes.
