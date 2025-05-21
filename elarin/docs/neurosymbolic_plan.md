@@ -69,6 +69,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   varied.【F:human_brain_components_reference.txt†L219-L245】【F:human_brain_components_reference.txt†L232-L239】【F:human_brain_components_reference.txt†L246-L250】
 - Refactor the obsolete Default Mode Network into interconnected prefrontal, posterior cingulate and angular gyrus modules.
 - Introduce a curiosity-driven intrinsic motivation module so unexplored tokens receive a small bonus during selection.
+- Predict candidate token valence from hippocampal memories so dopamine rises when an internally simulated action appears rewarding.
 - Add a ``neurogenesis`` bootstrapping step that seeds any zero-weight region with
   Kaiming-initialized parameters and tracks which modules have been born.
 - Refine the new PyGame training GUI so errors display in a dedicated pane and
