@@ -17,8 +17,8 @@ The interface will be implemented with Python's `curses` module so no extra depe
 
 ```
 ┌──────────────────────────────────────┐┌─────────────────────┐
-│ motor_cortex INFO                    ││ Selected Output      │
-│ [scrollable log with timestamps]     ││ [rating buttons]     │
+│ motor_cortex INFO                    ││ Selected Output     │
+│ [scrollable log with timestamps]     ││ [rating buttons]    │
 │                                      ││                     │
 │                                      ││ Text input for      │
 │                                      ││ corrective prompt   │
@@ -57,4 +57,3 @@ Ratings and corrections are appended to `persistent/cli_feedback.log` so future 
 * Replace the basic curses interface with the richer `textual` library once extra dependencies are permitted.
 * Add search/filter controls for long sessions.
 * Visualise hormone levels and novelty metrics in additional panes.
-
