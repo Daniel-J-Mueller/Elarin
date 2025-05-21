@@ -15,22 +15,6 @@ concept with a PyGame window that integrates logging and feedback controls.
 7. Training should propogate back through the layers of the network which are utilized to create a motor_cortex output and should produce a mapping where the output being trained is the entended output of the product of the auditory and visual context it had in its mind at that time.
 8. The previous state may require an adjustable memory buffer for the internal states, which can be set in the config file (starting with 'training_buffer=30', which means 30 seconds, and should have a comment saying so.)
 
-## Design
-
-The interface now uses PyGame and expands the existing viewer window. A small
-error bar spans the top while the main frame sits below it. A column of rating
-buttons and a text input box appear on the right:
-
-```
-┌──────────────────────────────────────┐┌─────────────────────┐
-│ motor_cortex INFO                    ││ Selected Output     │
-│ [scrollable log with timestamps]     ││ [rating buttons]    │
-│                                      ││                     │
-│                                      ││ Text input for      │
-│                                      ││ corrective prompt   │
-└──────────────────────────────────────┘└─────────────────────┘
-```
-
 ### Logging Handler
 
 A custom `logging.Handler` will capture messages from the `motor_cortex` logger.  Each record is stored with its timestamp.  Dates are compared against the previous entry and a coloured divider is inserted when the day changes.
@@ -68,6 +52,4 @@ Ratings and corrections are appended to `persistent/cli_feedback.log` so future 
 
 ## Future Improvements
 
-* Consider migrating the PyGame layout to a richer UI toolkit once extra dependencies are permitted.
-* Add search/filter controls for long sessions.
 * Visualise hormone levels and novelty metrics in additional panes.
