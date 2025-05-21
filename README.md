@@ -75,9 +75,10 @@ The script downloads the following models sequentially:
   python -m elarin.src.brain
   ```
 
-   Pass ``--gui_train`` to launch the PyGame training interface which expands
-   the viewer window with rating buttons and a text input box. Only warnings
-   and errors are printed to the terminal in this mode.
+  Pass ``--gui_train`` to launch the PyGame training interface which expands
+  the viewer window with a scrollable log of motor cortex messages,
+  colour‑coded rating buttons and a text input box. Only warnings
+  and errors are printed to the terminal in this mode.
 
    Alternatively, you can run `./scripts/run_brain.sh` which performs the
    same action with the proper `PYTHONPATH` configured.
