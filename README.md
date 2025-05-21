@@ -113,6 +113,8 @@ loop, loading the decapitated models, fusing a dummy image with text and
 printing the motor cortex output. A viewer window powered by ``pygame``
 displays the live camera feed with an audio level meter and text overlay.
 Press ``Ctrl+C`` to stop the brain.
+Click the **Treat** button at the bottom of the viewer to give positive feedback
+and boost dopamine levels.
 
 The ``settings`` section of ``configs/default.yaml`` now includes
 ``motor_candidates`` which controls how many speculative tokens the motor

@@ -750,9 +750,11 @@ def main(argv: list[str] | None = None) -> None:
 
             if viewer:
                 viewer.update(frame_rgb, out_text, audio_level)
-                taught = viewer.poll_text_input()
+                taught, treat = viewer.poll_text_input()
             else:
-                taught = None
+                taught, treat = None, False
+            if treat:
+                axis.update_valence(1.0)
             if taught:
                 teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
