@@ -10,6 +10,8 @@ This document outlines how to evolve the simple STDOUT logging into a usable ter
 4. Provide colour coded rating buttons (-5 … 5) next to each message.
 5. Allow selection of a message and submission of an alternate response for training.
 6. Apply positive or negative reinforcement when a rating is chosen.
+7. Training should propogate back through the layers of the network which are utilized to create a motor_cortex output and should produce a mapping where the output being trained is the entended output of the product of the auditory and visual context it had in its mind at that time.
+8. The previous state may require an adjustable memory buffer for the internal states, which can be set in the config file (starting with 'training_buffer=30', which means 30 seconds, and should have a comment saying so.)
 
 ## Design
 
