@@ -32,13 +32,19 @@ class Subiculum(nn.Module):
             self.load_state_dict(torch.load(self.persist_path, map_location=device))
 
     @torch.no_grad()
+    def forward(self, memory: torch.Tensor) -> torch.Tensor:
+        """Alias for :meth:`relay` so the module can be called directly."""
+        return self.relay(memory)
+
+    @torch.no_grad()
     def relay(self, memory: torch.Tensor) -> torch.Tensor:
         mem = memory.to(self.device)
         adj = self.short_lora(mem) + self.long_lora(mem)
         return self.proj(mem) + adj
 
     def save(self, path: str | None = None) -> None:
-        target = path or self.persist_path
+        target = Path(path) if path else self.persist_path
         if not target:
             return
+        target.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self.state_dict(), target)
