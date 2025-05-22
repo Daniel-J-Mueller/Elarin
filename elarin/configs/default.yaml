@@ -41,3 +41,4 @@ settings:
   neurogenesis: true
   training_buffer: 5  # seconds to retain context for GUI feedback
   ifg_feedback_buffer: 30  # seconds that inhibition feedback remains active
+  gpu_debug: false
