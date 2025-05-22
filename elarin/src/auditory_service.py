@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+import threading
 import torch
 
 from .auditory_cortex import AuditoryCortex
@@ -32,9 +32,9 @@ def main() -> None:
 
     bus.subscribe_array("audio_raw", handle)
 
+    stop = threading.Event()
     try:
-        while True:
-            time.sleep(1.0)
+        stop.wait()
     except KeyboardInterrupt:
         logger.info("auditory service stopped")
 

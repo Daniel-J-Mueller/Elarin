@@ -78,5 +78,26 @@ Each connection mirrors the anatomical ordering described in the reference text.
   system vocalises when distressed and learns from early feedback.
 - Delay further motor output until ratings are received or a short timeout
   expires so the system can associate feedback with the correct response.
+- Profile GPU memory and inference time to better distribute regions across
+  devices. The current layout (see `configs/default.yaml` lines 4–14) leaves
+  `cuda:1` and `cuda:2` mostly idle while `cuda:0` and `cuda:3` are saturated.
+  Rebalancing or running low-usage modules concurrently should raise throughput.
+- Investigate the dynamic wait in `brain.py` (lines 965–967) which grows to
+  nearly one second when norepinephrine or subthalamic inhibition is high.
+  Cap the delay to the configured `loop_interval` so the main loop maintains a
+  higher frame rate.
+- Replace the fixed one-second sleeps in `occipital_service.py` and
+  `auditory_service.py` with event-driven polling so these services react as soon
+  as new sensor data arrives.
+
+## Recent Updates
+
+- Capped the dynamic wait in `brain.py` so delays never exceed the configured
+  `loop_interval`.
+- Converted `occipital_service.py` and `auditory_service.py` to wait on an event
+  instead of looping with one-second sleeps, allowing immediate reaction when
+  messages arrive.
+- Redistributed GPU assignments in `configs/default.yaml` so sensors run on
+  `cuda:1` and `cuda:2`, while the trainer now uses `cuda:0`.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

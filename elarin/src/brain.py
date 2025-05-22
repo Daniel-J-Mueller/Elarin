@@ -964,6 +964,7 @@ def main(argv: list[str] | None = None) -> None:
                 )
             pause_level = 0.95 * pause_level + 0.05 * float(stn.inhibition(context))
             dynamic = max(0.01, loop_interval * (1.0 - axis.norepinephrine) * pause_level)
+            dynamic = min(loop_interval, dynamic)
             time.sleep(dynamic)
     except KeyboardInterrupt:
         logger.info("run interrupted")
