@@ -129,6 +129,12 @@ affect regions whose checkpoint files are missing or contain all zeros.
 If you prefer, you can disable the flag after the initial launch and
 restart Elarin normally.
 
+Negative ratings in the training GUI now also feed into the Inferior
+Frontal gyrus.  The ``ifg_feedback_buffer`` option determines how long
+recent motor outputs remain eligible for inhibition learning (default
+``30`` seconds).  Setting it higher allows stronger associations while a
+lower value forgets feedback more quickly.
+
 The motor cortex now predicts the likely valence of each speculative
 token using hippocampal recall and the amygdala before choosing which
 one to emit. When a predicted outcome appears favourable the

@@ -87,6 +87,7 @@ def main(argv: list[str] | None = None) -> None:
     log_to_file = bool(settings.get("log_to_file", False))
     neurogenesis = bool(settings.get("neurogenesis", False))
     training_buffer = float(settings.get("training_buffer", 30))
+    ifg_feedback_buffer = float(settings.get("ifg_feedback_buffer", 30))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -221,7 +222,9 @@ def main(argv: list[str] | None = None) -> None:
         init_state_file,
     )
     frontal = FrontalLobe(
-        device=devices["dmn"], persist_path=f"{persist_dir}/frontal_lobe.pt"
+        device=devices["dmn"],
+        persist_path=f"{persist_dir}/frontal_lobe.pt",
+        ifg_feedback_buffer=ifg_feedback_buffer,
     )
     maybe_initialize(
         frontal,
@@ -406,6 +409,7 @@ def main(argv: list[str] | None = None) -> None:
         num_candidates=motor_candidates,
         feedback_buffer=training_buffer,
         basal=basal,
+        ifg=frontal.inferior_frontal,
     )
     maybe_initialize(
         motor,

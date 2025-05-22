@@ -30,6 +30,8 @@ A vertical column of clickable buttons from -5 to 5 appears on the right.  Each
 click immediately calls ``MotorCortex.reinforce_output`` with the selected
 rating for the latest token. Negative numbers weaken that output while positive
 numbers reinforce it.
+They also train the Inferior Frontal gyrus to suppress similar text for a
+short period determined by ``ifg_feedback_buffer``.
 
 ### Correction Input
 

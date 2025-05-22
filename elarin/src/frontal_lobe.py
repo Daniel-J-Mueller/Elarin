@@ -20,13 +20,17 @@ class FrontalLobe(nn.Module):
         self,
         device: str = "cpu",
         persist_path: str | None = None,
+        *,
+        ifg_feedback_buffer: float = 30.0,
     ) -> None:
         super().__init__()
         self.prefrontal = PrefrontalCortex(device=device)
         self.orbitofrontal = OrbitofrontalCortex(device=device)
         self.premotor = PremotorCortex(device=device)
         self.middle_frontal = MiddleFrontalGyrus(device=device)
-        self.inferior_frontal = InferiorFrontalGyrus(device=device)
+        self.inferior_frontal = InferiorFrontalGyrus(
+            device=device, feedback_buffer=ifg_feedback_buffer
+        )
         self.device = device
         self.persist_path = Path(persist_path) if persist_path else None
         if self.persist_path and self.persist_path.exists():

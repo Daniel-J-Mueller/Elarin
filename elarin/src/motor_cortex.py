@@ -14,6 +14,7 @@ from .utils.sentinel import SentinelLinear
 from .utils.curiosity import CuriosityTracker
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
 from .basal_ganglia import BasalGanglia
+from .inferior_frontal_gyrus import InferiorFrontalGyrus
 from .trainer import Trainer
 from .utils.logger import get_logger
 
@@ -31,6 +32,7 @@ class MotorCortex(nn.Module):
         num_candidates: int = 1,
         feedback_buffer: float = 30.0,
         basal: "BasalGanglia | None" = None,
+        ifg: "InferiorFrontalGyrus | None" = None,
     ) -> None:
         super().__init__()
         self.logger = get_logger("motor_cortex")
@@ -53,6 +55,7 @@ class MotorCortex(nn.Module):
         self._trainer = Trainer()
         self.feedback_buffer = float(feedback_buffer)
         self.basal = basal
+        self.ifg = ifg
         self._recent = deque()  # (timestamp, token_id, context, token_emb)
         if persist_path and Path(persist_path).exists():
             state = torch.load(persist_path, map_location=device)
@@ -98,6 +101,8 @@ class MotorCortex(nn.Module):
             target,
             lr_scale=scale,
         )
+        if self.ifg is not None:
+            self.ifg.reinforce(rating)
 
     def modules(self):
         """Yield child modules for initialization."""
@@ -261,6 +266,8 @@ class MotorCortex(nn.Module):
         chosen_emb = enc[best_idx : best_idx + 1]
         self._recent.append((time.time(), tok_id, hidden.detach().cpu(), chosen_emb.detach().cpu()))
         self._trim_recent()
+        if self.ifg is not None:
+            self.ifg.record_output(hidden)
         return best_text, chosen_emb, enc, best_idx, texts
 
     @torch.no_grad()
