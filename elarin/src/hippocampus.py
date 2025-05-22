@@ -204,6 +204,7 @@ class DistributedHippocampus:
         num_shards: int = 1,
         *,
         shard_paths: Optional[List[str]] = None,
+        independent: bool = False,
         **kwargs,
     ) -> None:
         if shard_paths is None:
@@ -213,10 +214,19 @@ class DistributedHippocampus:
         self.shards = [
             Hippocampus(dims, persist_path=path, **kwargs) for path in shard_paths
         ]
+        self.independent = independent
+        self.next_shard = 0
 
-    def add_episode(self, episode: Dict[str, np.ndarray], valence: float = 0.0, *, salience: float = 1.0) -> None:
-        for shard in self.shards:
-            shard.add_episode(episode, valence, salience=salience)
+    def add_episode(
+        self, episode: Dict[str, np.ndarray], valence: float = 0.0, *, salience: float = 1.0
+    ) -> None:
+        if self.independent:
+            target = self.shards[self.next_shard]
+            target.add_episode(episode, valence, salience=salience)
+            self.next_shard = (self.next_shard + 1) % len(self.shards)
+        else:
+            for shard in self.shards:
+                shard.add_episode(episode, valence, salience=salience)
 
     def query(self, modality: str, embedding: np.ndarray, k: int = 5) -> Dict[str, np.ndarray]:
         merged: Dict[str, List[np.ndarray]] = {}
@@ -224,7 +234,12 @@ class DistributedHippocampus:
             res = shard.query(modality, embedding, k)
             for key, val in res.items():
                 merged.setdefault(key, []).append(val)
-        return {k: np.mean(v, axis=0) if isinstance(v[0], np.ndarray) else float(np.mean(v)) for k, v in merged.items()}
+        if not merged:
+            return {}
+        return {
+            k: np.mean(v, axis=0) if isinstance(v[0], np.ndarray) else float(np.mean(v))
+            for k, v in merged.items()
+        }
 
     def decay(self, rate: float = 0.99) -> None:
         for shard in self.shards:

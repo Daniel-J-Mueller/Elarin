@@ -120,6 +120,9 @@ The ``settings`` section of ``configs/default.yaml`` now includes
 ``motor_candidates`` which controls how many speculative tokens the motor
 cortex generates each step. Increasing this value trains on multiple
 possible outputs while only printing the highest-probability token.
+``hippocampus_shards`` sets the number of memory shards to use and
+``hippocampus_independent`` determines whether each shard stores unique
+episodes (mimicking left and right hemispheres) or mirrors the same data.
 ``neurogenesis`` can also be enabled to automatically seed blank region
 weights using Kaiming initialization whenever no trained parameters are
 found. This option is primarily useful the first time you run Elarin or

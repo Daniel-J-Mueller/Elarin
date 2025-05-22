@@ -62,6 +62,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 - Measure the impact of modality filtering and the unified Cochlea on reaction time, then refine the executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
 - Stress-test the ``DistributedHippocampus`` using the new memory usage reports and refine salience gating to prevent overload【F:human_brain_components_reference.txt†L108-L113】.
+- Split the hippocampus into left and right hemispheres running on separate GPUs so each half stores unique episodes and recall averages their responses through the corpus callosum【F:human_brain_components_reference.txt†L11-L14】.
 - Evaluate the new ``memory_pressure`` hook that raises serotonin and lowers dopamine as the hippocampus fills, ensuring stable neurotransmitter levels. Hormone levels are logged alongside the subthalamic baseline for later analysis【F:human_brain_components_reference.txt†L246-L250】.
 - Extend the basal ganglia into explicit caudate/putamen/pallidus/accumbens/nigra modules so action selection aligns with biological circuits.【F:human_brain_components_reference.txt†L219-L245】
 - Add an ``approve_action`` stage using the caudate nucleus, globus pallidus and
