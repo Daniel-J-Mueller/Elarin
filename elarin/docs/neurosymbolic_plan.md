@@ -82,18 +82,16 @@ Each connection mirrors the anatomical ordering described in the reference text.
   devices. The current layout (see `configs/default.yaml` lines 4–14) leaves
   `cuda:1` and `cuda:2` mostly idle while `cuda:0` and `cuda:3` are saturated.
   Rebalancing or running low-usage modules concurrently should raise throughput.
-- Investigate the dynamic wait in `brain.py` (lines 965–967) which grows to
-  nearly one second when norepinephrine or subthalamic inhibition is high.
-  Cap the delay to the configured `loop_interval` so the main loop maintains a
-  higher frame rate.
 - Replace the fixed one-second sleeps in `occipital_service.py` and
   `auditory_service.py` with event-driven polling so these services react as soon
   as new sensor data arrives.
 
 ## Recent Updates
 
-- Capped the dynamic wait in `brain.py` so delays never exceed the configured
-  `loop_interval`.
+- Removed the dynamic wait in `brain.py` entirely so the main loop runs at full
+  speed.
+- Eliminated sleep calls in `retina.py` and `cochlea.py` to avoid throttling
+  sensor updates.
 - Converted `occipital_service.py` and `auditory_service.py` to wait on an event
   instead of looping with one-second sleeps, allowing immediate reaction when
   messages arrive.

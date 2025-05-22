@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import numpy as np
 import torch
 
@@ -29,12 +27,10 @@ def main() -> None:
         while True:
             audio_np = buffer.read(duration)
             if len(audio_np) == 0:
-                time.sleep(duration)
                 continue
             audio_tensor = torch.from_numpy(audio_np).float().unsqueeze(0)
             emb = cochlea.encode([audio_tensor])
             bus.publish_array("audio_raw", emb.cpu().numpy())
-            time.sleep(duration)
     except KeyboardInterrupt:
         logger.info("cochlea service stopped")
     finally:

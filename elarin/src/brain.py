@@ -3,7 +3,6 @@
 from PIL import Image
 import torch
 torch.backends.cudnn.benchmark = True
-import time
 import cv2
 import numpy as np
 from pathlib import Path
@@ -963,9 +962,6 @@ def main(argv: list[str] | None = None) -> None:
                     lr_scale=2.0,
                 )
             pause_level = 0.95 * pause_level + 0.05 * float(stn.inhibition(context))
-            dynamic = max(0.01, loop_interval * (1.0 - axis.norepinephrine) * pause_level)
-            dynamic = min(loop_interval, dynamic)
-            time.sleep(dynamic)
     except KeyboardInterrupt:
         logger.info("run interrupted")
     finally:
