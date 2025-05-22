@@ -135,6 +135,10 @@ recent motor outputs remain eligible for inhibition learning (default
 ``30`` seconds).  Setting it higher allows stronger associations while a
 lower value forgets feedback more quickly.
 
+When ``gpu_debug`` is set ``true`` the brain logs the memory footprint of
+each major model to ``logs/GPU_debug.log`` during startup. This helps
+identify which components consume the most VRAM on multi‑GPU systems.
+
 The motor cortex now predicts the likely valence of each speculative
 token using hippocampal recall and the amygdala before choosing which
 one to emit. When a predicted outcome appears favourable the

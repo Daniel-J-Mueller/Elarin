@@ -2,11 +2,13 @@
 
 from PIL import Image
 import torch
+torch.backends.cudnn.benchmark = True
 import time
 import cv2
 import numpy as np
 from pathlib import Path
 import argparse
+from typing import Tuple
 
 from .utils.message_bus import MessageBus
 from .sensors.cochlea import Cochlea
@@ -52,6 +54,7 @@ from .utils.logger import (
     install_handler,
     set_stdout_level,
 )
+from .utils import log_model_memory, log_device_memory
 from .gui_train import GUITrain
 from .viewer import Viewer
 from .utils.camera import Camera
@@ -88,6 +91,7 @@ def main(argv: list[str] | None = None) -> None:
     neurogenesis = bool(settings.get("neurogenesis", False))
     training_buffer = float(settings.get("training_buffer", 30))
     ifg_feedback_buffer = float(settings.get("ifg_feedback_buffer", 30))
+    gpu_debug = bool(settings.get("gpu_debug", False))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -102,6 +106,7 @@ def main(argv: list[str] | None = None) -> None:
 
     logger = get_logger("brain")
     bus = MessageBus()
+    models_for_profile: list[tuple[torch.nn.Module, str]] = []
 
     retina = Retina(models["clip"], device=devices["retina"])
     primary_vis = PrimaryVisualCortex(device=devices["occipital_lobe"])
@@ -109,12 +114,25 @@ def main(argv: list[str] | None = None) -> None:
     cochlea = Cochlea(models["whisper"], device=devices["cochlea"])
     primary_aud = PrimaryAuditoryCortex(device=devices["auditory_cortex"])
     auditory = AuditoryCortex(device=devices["auditory_cortex"])
+    if gpu_debug:
+        models_for_profile.extend(
+            [
+                (retina.model, "retina"),
+                (primary_vis, "primary_visual"),
+                (occipital, "occipital_lobe"),
+                (cochlea.model, "cochlea"),
+                (primary_aud, "primary_auditory"),
+                (auditory, "auditory_cortex"),
+            ]
+        )
 
     wernicke = WernickesArea(
         models["gpt2"],
         device=devices["language_areas"],
         token_table_path=f"{persist_dir}/token_embeddings.npy",
     )
+    if gpu_debug:
+        models_for_profile.append((wernicke.model, "wernicke"))
 
     valence_path = persist_dir / "valence.npy"
     if valence_path.exists():
@@ -141,6 +159,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((sup_parietal, "superior_parietal_lobule"))
     inf_parietal = InferiorParietalLobule(
         device=devices["dmn"], persist_path=f"{persist_dir}/inferior_parietal_lobule.pt"
     )
@@ -151,6 +171,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((inf_parietal, "inferior_parietal_lobule"))
     precuneus = Precuneus(
         input_dim=128 + 896 + 768,
         output_dim=768,
@@ -164,6 +186,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((precuneus, "precuneus"))
     hip_dims = {
         "vision": 128,
         "audio": 896,
@@ -202,6 +226,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((dentate, "dentate_gyrus"))
     subiculum = Subiculum(device=devices["dmn"], persist_path=f"{persist_dir}/subiculum.pt")
     maybe_initialize(
         subiculum,
@@ -211,6 +237,8 @@ def main(argv: list[str] | None = None) -> None:
         init_state_file,
         var_scale=1.1,
     )
+    if gpu_debug:
+        models_for_profile.append((subiculum, "subiculum"))
     amygdala = Amygdala(
         device=devices["dmn"], persist_path=f"{persist_dir}/amygdala_emotion.pt"
     )
@@ -221,6 +249,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((amygdala, "amygdala"))
     frontal = FrontalLobe(
         device=devices["dmn"],
         persist_path=f"{persist_dir}/frontal_lobe.pt",
@@ -233,6 +263,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((frontal, "frontal_lobe"))
     pfc = frontal.prefrontal
     corpus = CorpusCallosum(
         embed_dim=768,
@@ -246,6 +278,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((corpus, "corpus_callosum"))
     axis = HypothalamusPituitaryAxis()
     pituitary = PituitaryGland(device=devices["dmn"], persist_path=f"{persist_dir}/pituitary_gland.pt")
     maybe_initialize(
@@ -255,6 +289,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((pituitary, "pituitary_gland"))
     entorhinal = EntorhinalCortex(device=devices["dmn"], persist_path=f"{persist_dir}/entorhinal_cortex.pt")
     maybe_initialize(
         entorhinal,
@@ -263,6 +299,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((entorhinal, "entorhinal_cortex"))
     parietal = ParietalLobe(device=devices["occipital_lobe"], persist_path=f"{persist_dir}/parietal_lobe.pt")
     maybe_initialize(
         parietal,
@@ -271,6 +309,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((parietal, "parietal_lobe"))
     cingulate = CingulateCortex(device=devices["dmn"], persist_path=f"{persist_dir}/cingulate_cortex.pt")
     maybe_initialize(
         cingulate,
@@ -279,6 +319,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((cingulate, "cingulate_cortex"))
     midbrain = Midbrain(device=devices["dmn"], persist_path=f"{persist_dir}/midbrain.pt")
     maybe_initialize(
         midbrain,
@@ -287,6 +329,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((midbrain, "midbrain"))
     pons = Pons(device=devices["dmn"], persist_path=f"{persist_dir}/pons.pt")
     maybe_initialize(
         pons,
@@ -295,6 +339,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((pons, "pons"))
     medulla = MedullaOblongata(device=devices["dmn"], persist_path=f"{persist_dir}/medulla_oblongata.pt")
     maybe_initialize(
         medulla,
@@ -303,6 +349,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((medulla, "medulla_oblongata"))
     stn = SubthalamicNucleus(device=devices["dmn"])
     basal = BasalGanglia(
         input_dim=768,
@@ -320,6 +368,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((basal, "basal_ganglia"))
     maybe_initialize(
         basal.caudate,
         f"{persist_dir}/caudate_nucleus.pt",
@@ -355,6 +405,16 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.extend(
+            [
+                (basal.caudate, "caudate_nucleus"),
+                (basal.putamen, "putamen"),
+                (basal.pallidus, "globus_pallidus"),
+                (basal.accumbens, "nucleus_accumbens"),
+                (basal.nigra, "substantia_nigra"),
+            ]
+        )
     insular = InsularCortex(
         device=devices["dmn"],
         persist_path=f"{persist_dir}/insular_mapping.pt",
@@ -366,6 +426,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((insular, "insular_cortex"))
     temporal = TemporalLobe()
     augmenter = WernickeAdapter(
         device=devices["language_areas"],
@@ -378,6 +440,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((augmenter, "wernicke_adapter"))
     insula = InsularCortex(
         device=devices["motor_cortex"],
         persist_path=f"{persist_dir}/motor_insula.pt",
@@ -389,6 +453,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((insula, "motor_insula"))
     cerebellum = Cerebellum(
         device=devices.get("cerebellum", devices["motor_cortex"]),
         persist_path=f"{persist_dir}/cerebellum_correction.pt",
@@ -400,6 +466,8 @@ def main(argv: list[str] | None = None) -> None:
         neurogenesis,
         init_state_file,
     )
+    if gpu_debug:
+        models_for_profile.append((cerebellum, "cerebellum"))
     motor = MotorCortex(
         models["gpt2"],
         wernicke,
@@ -419,9 +487,15 @@ def main(argv: list[str] | None = None) -> None:
         init_state_file,
         bias_shift=0.01,
     )
+    if gpu_debug:
+        models_for_profile.append((motor.area.model.transformer, "motor_cortex"))
 
     thalamus = Thalamus()
+    if gpu_debug:
+        models_for_profile.append((thalamus, "thalamus"))
     trainer = Trainer()
+    if gpu_debug:
+        models_for_profile.append((trainer, "trainer"))
     gui = None
     if args.gui_train:
         gui = GUITrain(motor, buffer_seconds=training_buffer)
@@ -444,6 +518,13 @@ def main(argv: list[str] | None = None) -> None:
     audio_buf = AudioBuffer(
         samplerate=16000, channels=1, buffer_seconds=audio_duration * 2
     )
+
+    if gpu_debug:
+        for m, name in models_for_profile:
+            log_model_memory(m, name, log_dir)
+        for dev in set(devices.values()):
+            if str(dev).startswith("cuda"):
+                log_device_memory(str(dev), log_dir)
 
     step = 0
     pause_level = 1.0
