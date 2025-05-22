@@ -35,6 +35,13 @@ class Precuneus(nn.Module):
     @torch.no_grad()
     def reflect(self, embedding: torch.Tensor) -> torch.Tensor:
         emb = embedding.to(self.device)
+        expected = self.short_lora.A.size(1)
+        if emb.size(-1) != expected:
+            if emb.size(-1) < expected:
+                pad = expected - emb.size(-1)
+                emb = torch.nn.functional.pad(emb, (0, pad))
+            else:
+                emb = emb[..., :expected]
         adj = self.short_lora(emb) + self.long_lora(emb)
         return self.net(emb) + adj
 

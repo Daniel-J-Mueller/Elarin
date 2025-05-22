@@ -442,6 +442,7 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     step = 0
+    pause_level = 1.0
 
     try:
         while True:
@@ -858,7 +859,9 @@ def main(argv: list[str] | None = None) -> None:
                     teach_emb,
                     lr_scale=2.0,
                 )
-            time.sleep(loop_interval)
+            pause_level = 0.95 * pause_level + 0.05 * float(stn.inhibition(context))
+            dynamic = max(0.01, loop_interval * (1.0 - axis.norepinephrine) * pause_level)
+            time.sleep(dynamic)
     except KeyboardInterrupt:
         logger.info("run interrupted")
     finally:
