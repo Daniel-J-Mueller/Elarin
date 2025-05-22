@@ -7,3 +7,4 @@ from .gpu_debug import (
     log_model_memory,
     log_device_memory,
 )
+from .model_timing import log_timing

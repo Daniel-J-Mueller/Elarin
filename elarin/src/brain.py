@@ -54,7 +54,7 @@ from .utils.logger import (
     install_handler,
     set_stdout_level,
 )
-from .utils import log_model_memory, log_device_memory
+from .utils import log_model_memory, log_device_memory, log_timing
 from .gui_train import GUITrain
 from .viewer import Viewer
 from .utils.camera import Camera
@@ -92,6 +92,7 @@ def main(argv: list[str] | None = None) -> None:
     training_buffer = float(settings.get("training_buffer", 30))
     ifg_feedback_buffer = float(settings.get("ifg_feedback_buffer", 30))
     gpu_debug = bool(settings.get("gpu_debug", False))
+    timing_debug = bool(settings.get("model_timing_debug", False))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -489,11 +490,15 @@ def main(argv: list[str] | None = None) -> None:
     )
     if gpu_debug:
         models_for_profile.append((motor.area.model.transformer, "motor_cortex"))
+    motor._trainer.timing_debug = timing_debug
+    motor._trainer.log_dir = log_dir
 
     thalamus = Thalamus()
     if gpu_debug:
         models_for_profile.append((thalamus, "thalamus"))
     trainer = Trainer()
+    trainer.timing_debug = timing_debug
+    trainer.log_dir = log_dir
     if gpu_debug:
         models_for_profile.append((trainer, "trainer"))
     gui = None
@@ -720,10 +725,11 @@ def main(argv: list[str] | None = None) -> None:
                         vals.append(val)
                     return torch.tensor(vals, device=embs.device)
 
-                out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(
-                    context,
-                    valence_fn=predict_fn,
-                )
+                with log_timing("motor_cortex", "inference", timing_debug, log_dir):
+                    out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(
+                        context,
+                        valence_fn=predict_fn,
+                    )
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
@@ -733,14 +739,16 @@ def main(argv: list[str] | None = None) -> None:
                     vis_as_motor = motor.vision_to_text(
                         vision_feat.to(motor.device)
                     )
-                    trainer.align(
-                        [cerebellum.short_lora, cerebellum.long_lora],
-                        vis_as_motor.to(cerebellum.device),
-                        out_aug.to(cerebellum.device),
-                    )
-                    motor.learn_from_feedback(
-                        vision_feat, user_emb, cand_aug, trainer
-                    )
+                    with log_timing("trainer", "training", timing_debug, log_dir):
+                        trainer.align(
+                            [cerebellum.short_lora, cerebellum.long_lora],
+                            vis_as_motor.to(cerebellum.device),
+                            out_aug.to(cerebellum.device),
+                        )
+                    with log_timing("motor_cortex", "training", timing_debug, log_dir):
+                        motor.learn_from_feedback(
+                            vision_feat, user_emb, cand_aug, trainer
+                        )
                     basal.register_output()
                 pred_vals = predict_fn(cand_embs)
                 if pred_vals.numel() > best_idx and pred_vals[best_idx] > 0:
