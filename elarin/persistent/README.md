@@ -8,6 +8,7 @@ Additional files:
   ``python elarin/src/utils/valence_table.py``
 
 Models saved by ``brain.py``:
+- Each LoRA layer is also stored separately as ``<region>_<adapter>.pt``.
 - ``hippocampus_memory.npz`` – episodic recall database (starts empty)
 - ``motor_cortex_adapters.pt`` – language generation adapters. Broca's area loads pretrained GPT-2; LoRA layers start at 0.
 - ``dentate_gyrus.pt`` – encoder for new hippocampal memories (0 weights)

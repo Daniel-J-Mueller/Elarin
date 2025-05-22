@@ -154,6 +154,8 @@ execution of that token more likely.
 
 All learned memories and adapter weights are automatically written to the
 ``elarin/persistent/`` directory so progress can be resumed on the next
-launch. Removing that directory resets the brain back to its initial
-state. You can also run ``python -m elarin.src.utils.memory_wipe`` to
-delete any saved snapshots in the ``elarin/persistent/`` folder.
+launch. Each LoRA adapter is saved to its own ``<region>_<adapter>.pt`` file
+alongside the main checkpoint so updates are never lost. Removing that
+directory resets the brain back to its initial state. You can also run
+``python -m elarin.src.utils.memory_wipe`` to delete any saved snapshots
+in the ``elarin/persistent/`` folder.

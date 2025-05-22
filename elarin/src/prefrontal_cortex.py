@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from pathlib import Path
 
-from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.adapters import FatigueLoRA, LongTermLoRA, save_loras
 from .utils.sentinel import SentinelLinear
 
 
@@ -63,3 +63,4 @@ class PrefrontalCortex(nn.Module):
         if not target:
             return
         torch.save(self.state_dict(), target)
+        save_loras(self, target)

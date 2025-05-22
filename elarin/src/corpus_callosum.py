@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from pathlib import Path
 
-from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.adapters import FatigueLoRA, LongTermLoRA, save_loras
 
 
 class CorpusCallosum(nn.Module):
@@ -41,3 +41,4 @@ class CorpusCallosum(nn.Module):
         if not target:
             return
         torch.save(self.state_dict(), target)
+        save_loras(self, target)
