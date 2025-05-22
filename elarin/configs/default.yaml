@@ -39,5 +39,5 @@ settings:
   # Number of speculative motor tokens to generate per step (debug mode)
   motor_candidates: 1
   neurogenesis: true
-  training_buffer: 30  # seconds to retain context for GUI feedback
+  training_buffer: 5  # seconds to retain context for GUI feedback
   ifg_feedback_buffer: 30  # seconds that inhibition feedback remains active
