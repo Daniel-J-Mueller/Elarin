@@ -19,3 +19,5 @@ elarin/persistent
 persistent/hippocampus.npy
 persistent/motor_cortex_generator.pt
 elarin/logs/debug.log
+elarin/logs/GPU_debug.log
+elarin/logs/model_timing_debug.log
