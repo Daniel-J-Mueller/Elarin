@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 import cv2
 from PIL import Image
 
@@ -32,7 +31,6 @@ def main() -> None:
             img = Image.fromarray(rgb).resize((224, 224))
             emb = retina.encode([img])
             bus.publish_array("vision_raw", emb.cpu().numpy())
-            time.sleep(0.02)
     except KeyboardInterrupt:
         logger.info("retina service stopped")
     finally:
