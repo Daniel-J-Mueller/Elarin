@@ -559,10 +559,14 @@ def main(argv: list[str] | None = None) -> None:
                     frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
                     img = Image.fromarray(frame_rgb).resize((224, 224))
 
-                vision_emb = retina.encode([img]).to(devices["occipital_lobe"])
-                prim_vis = primary_vis.extract(vision_emb)
-                vision_feat = occipital.process(prim_vis)
-                vision_feat = parietal.attend(vision_feat)
+                with log_timing("retina", "inference", timing_debug, log_dir):
+                    vision_emb = retina.encode([img]).to(devices["occipital_lobe"])
+                with log_timing("primary_visual_cortex", "inference", timing_debug, log_dir):
+                    prim_vis = primary_vis.extract(vision_emb)
+                with log_timing("occipital_lobe", "inference", timing_debug, log_dir):
+                    vision_feat = occipital.process(prim_vis)
+                with log_timing("parietal_lobe", "inference", timing_debug, log_dir):
+                    vision_feat = parietal.attend(vision_feat)
                 thalamus.submit("vision", vision_feat)
             else:
                 frame_rgb = np.zeros((224, 224, 3), dtype=np.uint8)
@@ -580,14 +584,19 @@ def main(argv: list[str] | None = None) -> None:
                 audio_tensor = (
                     torch.from_numpy(audio_np).float().to(cochlea.device)
                 )
-                spoken = cochlea.transcribe(audio_tensor)
-                emb = cochlea.encode([audio_tensor])
-                prim_aud = primary_aud.extract(emb)
-                audio_feat = auditory.process(prim_aud)
+                with log_timing("cochlea", "inference", timing_debug, log_dir):
+                    spoken = cochlea.transcribe(audio_tensor)
+                with log_timing("cochlea", "inference", timing_debug, log_dir):
+                    emb = cochlea.encode([audio_tensor])
+                with log_timing("primary_auditory_cortex", "inference", timing_debug, log_dir):
+                    prim_aud = primary_aud.extract(emb)
+                with log_timing("auditory_cortex", "inference", timing_debug, log_dir):
+                    audio_feat = auditory.process(prim_aud)
                 if audio_feat.dim() == 3:
                     audio_feat = audio_feat.mean(dim=1)
             if spoken:
-                text_emb = wernicke.encode([spoken]).mean(dim=1)
+                with log_timing("wernickes_area", "inference", timing_debug, log_dir):
+                    text_emb = wernicke.encode([spoken]).mean(dim=1)
                 temporal.clear()
             else:
                 text_emb = torch.zeros(
@@ -870,7 +879,8 @@ def main(argv: list[str] | None = None) -> None:
             if treat:
                 axis.update_valence(1.0)
             if taught:
-                teach_emb = wernicke.encode([taught]).mean(dim=1)
+                with log_timing("wernickes_area", "inference", timing_debug, log_dir):
+                    teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
                 teach_val = amygdala.evaluate(teach_emb)
                 tokens = wernicke.tokenizer.encode(taught)
