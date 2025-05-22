@@ -9,7 +9,7 @@ from typing import Callable
 
 from .language_areas.brocas_area import BrocasArea
 from .language_areas.wernickes_area import WernickesArea
-from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.adapters import FatigueLoRA, LongTermLoRA, save_loras
 from .utils.sentinel import SentinelLinear
 from .utils.curiosity import CuriosityTracker
 from .hypothalamus_pituitary_axis import HypothalamusPituitaryAxis
@@ -138,6 +138,7 @@ class MotorCortex(nn.Module):
             },
             target,
         )
+        save_loras(self, target)
 
     @torch.no_grad()
     def act(

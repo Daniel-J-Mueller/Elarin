@@ -7,7 +7,7 @@ import torch
 from torch import nn
 
 from .utils.sentinel import SentinelLinear
-from .utils.adapters import FatigueLoRA, LongTermLoRA
+from .utils.adapters import FatigueLoRA, LongTermLoRA, save_loras
 
 
 class PrimaryVisualCortex(nn.Module):
@@ -44,3 +44,4 @@ class PrimaryVisualCortex(nn.Module):
         if not target:
             return
         torch.save(self.state_dict(), target)
+        save_loras(self, target)

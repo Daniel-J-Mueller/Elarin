@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from pathlib import Path
 
 
 class FatigueLoRA(nn.Module):
@@ -55,3 +56,15 @@ class LongTermLoRA(nn.Module):
         out = torch.matmul(x, self.A.t())
         out = torch.matmul(out, self.B.t()) / max(1, self.r)
         return out
+
+
+def save_loras(module: nn.Module, base_path: str | Path) -> None:
+    """Persist any direct LoRA children of ``module``."""
+
+    base = Path(base_path)
+    stem = base.stem
+    for name, child in module.named_children():
+        if isinstance(child, (FatigueLoRA, LongTermLoRA)):
+            path = base.with_name(f"{stem}_{name}.pt")
+            torch.save(child.state_dict(), path)
+
