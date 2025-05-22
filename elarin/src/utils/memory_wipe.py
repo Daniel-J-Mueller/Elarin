@@ -22,7 +22,7 @@ def wipe(persist_dir: str | Path | None = None) -> None:
     for filename in (
         "hippocampus_memory.npy",
         "hippocampus_memory.npz",
-        "motor_cortex_generator.pt",
+        "motor_cortex_adapters.pt",
         "wernicke_adapter.pt",
         "insular_mapping.pt",
         "motor_insula.pt",

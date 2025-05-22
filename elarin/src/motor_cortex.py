@@ -59,7 +59,6 @@ class MotorCortex(nn.Module):
         self._recent = deque()  # (timestamp, token_id, context, token_emb)
         if persist_path and Path(persist_path).exists():
             state = torch.load(persist_path, map_location=device)
-            self.area.model.load_state_dict(state.get("broca", {}), strict=False)
             self.vision_to_text.load_state_dict(state.get("vision_to_text", {}), strict=False)
             self.damp_lora.load_state_dict(state.get("damp_lora", {}), strict=False)
             self.long_lora.load_state_dict(state.get("long_lora", {}), strict=False)
@@ -106,12 +105,11 @@ class MotorCortex(nn.Module):
 
     def modules(self):
         """Yield child modules for initialization."""
-        for m in (self.area.model, self.vision_to_text, self.damp_lora, self.long_lora):
+        for m in (self.vision_to_text, self.damp_lora, self.long_lora):
             yield m
 
     # enable loading via :func:`maybe_initialize`
     def load_state_dict(self, state: dict, strict: bool = False):
-        self.area.model.load_state_dict(state.get("broca", {}), strict=strict)
         self.vision_to_text.load_state_dict(state.get("vision_to_text", {}), strict=strict)
         self.damp_lora.load_state_dict(state.get("damp_lora", {}), strict=strict)
         self.long_lora.load_state_dict(state.get("long_lora", {}), strict=strict)
@@ -120,7 +118,6 @@ class MotorCortex(nn.Module):
 
     def state_dict(self):
         return {
-            "broca": self.area.model.state_dict(),
             "vision_to_text": self.vision_to_text.state_dict(),
             "damp_lora": self.damp_lora.state_dict(),
             "long_lora": self.long_lora.state_dict(),
@@ -134,7 +131,6 @@ class MotorCortex(nn.Module):
             return
         torch.save(
             {
-                "broca": self.area.model.state_dict(),
                 "vision_to_text": self.vision_to_text.state_dict(),
                 "damp_lora": self.damp_lora.state_dict(),
                 "long_lora": self.long_lora.state_dict(),

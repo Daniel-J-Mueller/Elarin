@@ -9,7 +9,7 @@ Additional files:
 
 Models saved by ``brain.py``:
 - ``hippocampus_memory.npz`` – episodic recall database (starts empty)
-- ``motor_cortex_generator.pt`` – language generation adapters. Broca's area loads pretrained GPT-2; LoRA layers start at 0.
+- ``motor_cortex_adapters.pt`` – language generation adapters. Broca's area loads pretrained GPT-2; LoRA layers start at 0.
 - ``dentate_gyrus.pt`` – encoder for new hippocampal memories (0 weights)
 - ``subiculum.pt`` – mapper returning memories to cortex (0 weights)
 - ``caudate_nucleus.pt`` – basal ganglia reward gating (0 weights)

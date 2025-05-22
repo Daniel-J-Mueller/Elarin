@@ -17,7 +17,7 @@ elarin/src/__pycache__
 */__pycache__/
 elarin/persistent
 persistent/hippocampus.npy
-persistent/motor_cortex_generator.pt
+persistent/motor_cortex_adapters.pt
 elarin/logs/debug.log
 elarin/logs/GPU_debug.log
 elarin/logs/model_timing_debug.log
