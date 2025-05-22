@@ -475,7 +475,7 @@ def main(argv: list[str] | None = None) -> None:
         wernicke,
         device=devices["motor_cortex"],
         axis=axis,
-        persist_path=f"{persist_dir}/motor_cortex_generator.pt",
+        persist_path=f"{persist_dir}/motor_cortex_adapters.pt",
         num_candidates=motor_candidates,
         feedback_buffer=training_buffer,
         basal=basal,
@@ -483,9 +483,9 @@ def main(argv: list[str] | None = None) -> None:
     )
     maybe_initialize(
         motor,
-        f"{persist_dir}/motor_cortex_generator.pt",
-        "motor_cortex_generator",
-        neurogenesis,
+        f"{persist_dir}/motor_cortex_adapters.pt",
+        "motor_cortex_adapters",
+        False,
         init_state_file,
         bias_shift=0.01,
     )
