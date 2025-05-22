@@ -90,4 +90,14 @@ Each connection mirrors the anatomical ordering described in the reference text.
   `auditory_service.py` with event-driven polling so these services react as soon
   as new sensor data arrives.
 
+## Recent Updates
+
+- Capped the dynamic wait in `brain.py` so delays never exceed the configured
+  `loop_interval`.
+- Converted `occipital_service.py` and `auditory_service.py` to wait on an event
+  instead of looping with one-second sleeps, allowing immediate reaction when
+  messages arrive.
+- Redistributed GPU assignments in `configs/default.yaml` so sensors run on
+  `cuda:1` and `cuda:2`, while the trainer now uses `cuda:0`.
+
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

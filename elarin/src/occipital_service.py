@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+import threading
 import torch
 
 from .occipital_lobe import OccipitalLobe
@@ -30,9 +30,9 @@ def main() -> None:
 
     bus.subscribe_array("vision_raw", handle)
 
+    stop = threading.Event()
     try:
-        while True:
-            time.sleep(1.0)
+        stop.wait()
     except KeyboardInterrupt:
         logger.info("occipital service stopped")
 

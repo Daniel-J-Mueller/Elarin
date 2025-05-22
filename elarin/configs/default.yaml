@@ -2,16 +2,16 @@
 
 # GPU allocation for each major module
 devices:
-  retina: cuda:0
-  cochlea: cuda:0
+  retina: cuda:1
+  cochlea: cuda:2
   occipital_lobe: cuda:1
-  auditory_cortex: cuda:1
+  auditory_cortex: cuda:2
   dmn: cuda:2
   hippocampus: cuda:2
   cortex_modules: cuda:2
   motor_cortex: cuda:3
   language_areas: cuda:3
-  trainer: cuda:3
+  trainer: cuda:0
 
 # Paths to offline models relative to repository root
 models:
