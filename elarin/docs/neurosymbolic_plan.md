@@ -98,5 +98,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   messages arrive.
 - Redistributed GPU assignments in `configs/default.yaml` so sensors run on
   `cuda:1` and `cuda:2`, while the trainer now uses `cuda:0`.
+- Integrated the `kokoro` TTS library for the `hexgrad/Kokoro-82M` model to
+  improve speech quality and allow future voice customisation.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
