@@ -58,6 +58,8 @@ from .gui_train import GUITrain
 from .viewer import Viewer
 from .utils.camera import Camera
 from .utils.audio_buffer import AudioBuffer
+from .utils.tts import KokoroTTS
+from .utils.audio_player import play_audio
 from .utils.neurogenesis import maybe_initialize
 
 
@@ -93,6 +95,7 @@ def main(argv: list[str] | None = None) -> None:
     ifg_feedback_buffer = float(settings.get("ifg_feedback_buffer", 30))
     gpu_debug = bool(settings.get("gpu_debug", False))
     timing_debug = bool(settings.get("model_timing_debug", False))
+    tts_enabled = bool(settings.get("TTS", False))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -115,6 +118,10 @@ def main(argv: list[str] | None = None) -> None:
     cochlea = Cochlea(models["whisper"], device=devices["cochlea"])
     primary_aud = PrimaryAuditoryCortex(device=devices["auditory_cortex"])
     auditory = AuditoryCortex(device=devices["auditory_cortex"])
+    tts = None
+    if tts_enabled:
+        tts_path = models.get("kokoro_tts", "models/kokoro-82m")
+        tts = KokoroTTS(tts_path, device=devices["motor_cortex"])
     if gpu_debug:
         models_for_profile.extend(
             [
@@ -783,6 +790,10 @@ def main(argv: list[str] | None = None) -> None:
                 fb_aug = torch.zeros_like(out_aug)
             if out_text:
                 silent_steps = 0
+                if tts is not None:
+                    audio_out = tts.synthesize(out_text)
+                    play_audio(audio_out, samplerate=tts.sample_rate)
+                    audio_buf.inject(audio_out)
             else:
                 silent_steps += 1
                 if silent_steps > 10:

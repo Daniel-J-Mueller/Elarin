@@ -8,3 +8,5 @@ from .gpu_debug import (
     log_device_memory,
 )
 from .model_timing import log_timing
+from .tts import KokoroTTS
+from .audio_player import play_audio
