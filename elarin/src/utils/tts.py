@@ -26,7 +26,10 @@ class KokoroTTS:
             Voice preset to use when generating speech.
         """
 
-        self.pipe = KPipeline(model_path=model_dir, device=device, lang_code="a")
+        # The Kokoro pipeline expects ``model_dir`` as the first positional
+        # argument rather than the ``model_path`` keyword used previously.
+        # Passing the wrong keyword caused ``TypeError`` during startup.
+        self.pipe = KPipeline(model_dir, device=device, lang_code="a")
         self.sample_rate = samplerate
         self.voice = voice
 
