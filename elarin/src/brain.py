@@ -744,12 +744,14 @@ def main(argv: list[str] | None = None) -> None:
                     return torch.tensor(vals, device=embs.device)
 
                 with log_timing("motor_cortex", "inference", timing_debug, log_dir):
-                    out_text, out_emb, cand_embs, best_idx, cand_texts = motor.act(
+                    out_text, out_emb, fb_emb, cand_embs, best_idx, cand_texts = motor.act(
                         context,
                         valence_fn=predict_fn,
+                        num_candidates=2,
                     )
                 cand_aug = augmenter(cand_embs)
                 out_aug = cand_aug[best_idx : best_idx + 1]
+                fb_aug = augmenter(fb_emb)
                 out_aug = cerebellum.adjust(out_aug, vision_feat)
                 if basal.approve_action(out_aug):
                     temporal.add_speculation(cand_texts)
@@ -808,7 +810,7 @@ def main(argv: list[str] | None = None) -> None:
             stn.reinforce(valence)
             axis.adjust_inhibition(stn.baseline)
             axis.memory_pressure(hippocampus.memory_usage_gb())
-            motor_intero = insular(out_aug)
+            motor_intero = insular(fb_aug)
             filtered = axis.filter_intero(motor_intero)
             # Negate feedback to dampen repeated thoughts
             thalamus.submit("intero", -filtered)
