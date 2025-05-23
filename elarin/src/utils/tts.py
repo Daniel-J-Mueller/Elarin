@@ -28,8 +28,12 @@ class KokoroTTS:
 
         # The Kokoro pipeline expects ``model_dir`` as the first positional
         # argument rather than the ``model_path`` keyword used previously.
-        # Passing the wrong keyword caused ``TypeError`` during startup.
-        self.pipe = KPipeline(model_dir, device=device, lang_code="a")
+        # Passing the wrong keyword caused ``TypeError`` during startup. Some
+        # versions also interpret the second positional argument as
+        # ``lang_code`` which caused ``multiple values for lang_code`` errors
+        # when specifying it by keyword. Supplying the language code
+        # positionally avoids that issue and keeps the GPU device selectable.
+        self.pipe = KPipeline(model_dir, "a", device=device)
         self.sample_rate = samplerate
         self.voice = voice
 

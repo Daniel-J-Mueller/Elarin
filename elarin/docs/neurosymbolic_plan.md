@@ -100,5 +100,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   `cuda:1` and `cuda:2`, while the trainer now uses `cuda:0`.
 - Integrated the `kokoro` TTS library for the `hexgrad/Kokoro-82M` model to
   improve speech quality and allow future voice customisation.
+- Added a dedicated `devices.kokoro_tts` entry so speech synthesis can run on
+  its own GPU (default `cuda:3`).
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
