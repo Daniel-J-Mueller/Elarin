@@ -26,16 +26,22 @@ class KokoroTTS:
             Voice preset to use when generating speech.
         """
 
-        # The Kokoro library changed the ``KPipeline`` constructor to expect
-        # the language code first followed by the path to the model directory.
-        # Passing the directory as the first positional argument now results in
-        # it being treated as ``lang_code`` which triggers an assertion error.
-        # To remain compatible with the updated API we explicitly provide the
-        # language code (``"a"`` for American English) as the first argument and
-        # pass ``model_dir`` second.  Using keywords keeps backwards
-        # compatibility with older versions that still accept ``model_dir`` by
-        # name while allowing the GPU device to be selected.
-        self.pipe = KPipeline("a", model_dir=model_dir, device=device)
+        # ``KPipeline`` has seen API changes across versions.  Newer releases
+        # expect a language code as the first positional argument followed by
+        # the model directory, while older versions simply took the directory
+        # (optionally named ``model_dir``) and the device.  To support either
+        # variant we inspect the constructor signature and call accordingly.
+        import inspect
+
+        kp_init = inspect.signature(KPipeline.__init__)
+        params = kp_init.parameters
+
+        if "lang_code" in params:
+            # Newer API - language code first then model directory.
+            self.pipe = KPipeline("a", model_dir=model_dir, device=device)
+        else:
+            # Older API - only the directory and device.
+            self.pipe = KPipeline(model_dir, device=device)
         self.sample_rate = samplerate
         self.voice = voice
 
