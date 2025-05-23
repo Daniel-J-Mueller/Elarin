@@ -18,6 +18,7 @@ MODELS: Dict[str, str] = {
     "whisper-small": "openai/whisper-small",
     "gpt2": "gpt2",
     "nomic-embed-text-v2-moe": "nomic-ai/nomic-embed-text-v2-moe",
+    "kokoro-82m": "hexgrad/Kokoro-82M",
 }
 
 

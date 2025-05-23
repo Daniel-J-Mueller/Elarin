@@ -19,6 +19,7 @@ models:
   whisper: models/whisper-small
   gpt2: models/gpt2
   nomic: models/nomic-embed-text-v2-moe
+  kokoro_tts: models/kokoro-82m
 
 # Embedding model options:
 # 1 - gpt2
@@ -50,3 +51,4 @@ settings:
   ifg_feedback_buffer: 30  # seconds that inhibition feedback remains active
   gpu_debug: true
   model_timing_debug: true
+  TTS: true

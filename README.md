@@ -45,6 +45,7 @@ The script downloads the following models sequentially:
    - `openai/whisper-small`
    - `gpt2`
    - `nomic-ai/nomic-embed-text-v2-moe`
+   - `hexgrad/Kokoro-82M`
 
 3. **Precompute Token Embeddings**
 
@@ -150,6 +151,10 @@ identify which components consume the most VRAM on multi‑GPU systems.
 When ``model_timing_debug`` is ``true`` Elarin records the time spent in
 each brain region's inference step to ``logs/model_timing_debug.log``. This
 can be used to spot slow components during development.
+
+Setting ``TTS`` to ``true`` enables speech synthesis of motor outputs using the
+``hexgrad/Kokoro-82M`` model. The resulting audio is played aloud and also fed
+back into the cochlea so Elarin can hear her own voice.
 
 The motor cortex now predicts the likely valence of each speculative
 token using hippocampal recall and the amygdala before choosing which
