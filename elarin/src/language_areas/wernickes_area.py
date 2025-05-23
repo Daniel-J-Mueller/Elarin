@@ -11,9 +11,12 @@ class WernickesArea:
     produced. Tokens are transient and never kept in memory after encoding.
     """
 
-    def __init__(self, model_dir: str, device: str = "cpu", token_table_path: Optional[str] = None):
+    def __init__(self, model_dir: str, device: str = "cpu", token_table_path: Optional[str] = None, trust_remote_code: bool = True):
         # Load tokenizer using ``AutoTokenizer`` to allow non-GPT models.
-        self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
+        # ``trust_remote_code=True`` enables loading custom code from local
+        # repositories without prompting the user.  This is required for some
+        # embedding models packaged with additional modules.
+        self.tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=trust_remote_code)
         # Some tokenizers may not define a padding token which breaks batching
         # when ``padding=True`` is requested.  Use the EOS token as padding to
         # keep sequence length consistent across calls.
@@ -21,7 +24,9 @@ class WernickesArea:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # ``AutoModel`` can load both GPT-2 and alternative embedding models.
-        self.model = AutoModel.from_pretrained(model_dir)
+        # ``trust_remote_code=True`` allows models that ship custom code to
+        # initialise correctly when loaded from a local directory.
+        self.model = AutoModel.from_pretrained(model_dir, trust_remote_code=trust_remote_code)
         self.model.to(device)
         self.model.eval()
         self.device = device
