@@ -157,6 +157,9 @@ Setting ``TTS`` to ``true`` enables speech synthesis of motor outputs via the
 ``kokoro`` library and the ``hexgrad/Kokoro-82M`` model. Ensure
 ``espeak-ng`` is installed for audio playback. The resulting audio is played
 aloud and also fed back into the cochlea so Elarin can hear her own voice.
+The GPU used for speech synthesis can be selected with the
+``devices.kokoro_tts`` option in ``configs/default.yaml`` which defaults to
+``cuda:3``.
 
 The motor cortex now predicts the likely valence of each speculative
 token using hippocampal recall and the amygdala before choosing which

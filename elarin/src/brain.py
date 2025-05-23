@@ -121,7 +121,8 @@ def main(argv: list[str] | None = None) -> None:
     tts = None
     if tts_enabled:
         tts_path = models.get("kokoro_tts", "models/kokoro-82m")
-        tts = KokoroTTS(tts_path, device=devices["motor_cortex"])
+        tts_device = devices.get("kokoro_tts", devices["motor_cortex"])
+        tts = KokoroTTS(tts_path, device=tts_device)
     if gpu_debug:
         models_for_profile.extend(
             [

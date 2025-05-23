@@ -11,6 +11,7 @@ devices:
   cortex_modules: cuda:2
   motor_cortex: cuda:3
   language_areas: cuda:3
+  kokoro_tts: cuda:3
   trainer: cuda:0
 
 # Paths to offline models relative to repository root
