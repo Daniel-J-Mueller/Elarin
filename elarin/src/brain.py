@@ -127,8 +127,16 @@ def main(argv: list[str] | None = None) -> None:
             ]
         )
 
+    embedding_choice = int(cfg.get("embedding_model", 1))
+    if embedding_choice == 1:
+        embed_path = models["gpt2"]
+    elif embedding_choice == 2:
+        embed_path = models.get("nomic", models["gpt2"])
+    else:
+        raise ValueError(f"unknown embedding_model: {embedding_choice}")
+
     wernicke = WernickesArea(
-        models["gpt2"],
+        embed_path,
         device=devices["language_areas"],
         token_table_path=f"{persist_dir}/token_embeddings.npy",
     )

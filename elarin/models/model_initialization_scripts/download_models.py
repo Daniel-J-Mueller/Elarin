@@ -17,6 +17,7 @@ MODELS: Dict[str, str] = {
     "clip-vit-b32": "openai/clip-vit-base-patch32",
     "whisper-small": "openai/whisper-small",
     "gpt2": "gpt2",
+    "nomic-embed-text-v2-moe": "nomic-ai/nomic-embed-text-v2-moe",
 }
 
 

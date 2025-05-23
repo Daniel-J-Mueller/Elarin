@@ -44,6 +44,7 @@ The script downloads the following models sequentially:
    - `openai/clip-vit-base-patch32`
    - `openai/whisper-small`
    - `gpt2`
+   - `nomic-ai/nomic-embed-text-v2-moe`
 
 3. **Precompute Token Embeddings**
 
@@ -88,9 +89,11 @@ The script downloads the following models sequentially:
 To keep the system on a purely semantic level, models are "decapitated"
 so that only continuous embeddings are passed between brain regions. The
 `WernickesArea` class in `src/language_areas/wernickes_area.py` wraps the
-front half of GPT-2 and exposes hidden-state embeddings without the
-language modeling head. Text is tokenized only transiently during
-encoding and is immediately discarded.
+front half of GPT-2 by default and exposes hidden-state embeddings without the
+language modeling head.  Alternatively, you can enable the
+`nomic-ai/nomic-embed-text-v2-moe` model in `configs/default.yaml` to
+experiment with a different encoder. Text is tokenized only transiently
+during encoding and is immediately discarded.
 
 Similarly, the `Retina` class in `src/sensors/retina.py` uses the vision
 branch of CLIP to convert raw images into 512-dimensional embeddings. No
@@ -120,6 +123,8 @@ The ``settings`` section of ``configs/default.yaml`` now includes
 ``motor_candidates`` which controls how many speculative tokens the motor
 cortex generates each step. Increasing this value trains on multiple
 possible outputs while only printing the highest-probability token.
+The ``embedding_model`` option at the top of the file chooses which
+text encoder to use (``1`` for GPT-2, ``2`` for the Nomic model).
 ``hippocampus_shards`` sets the number of memory shards to use and
 ``hippocampus_independent`` determines whether each shard stores unique
 episodes (mimicking left and right hemispheres) or mirrors the same data.

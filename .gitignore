@@ -8,6 +8,7 @@ object_memories
 elarin/models/clip-vit-b32
 elarin/models/gpt2
 elarin/models/whisper-small
+elarin/models/nomic-embed-text-v2-moe
 elarin/data/replay_buffer
 archive
 elarin/src/utils/__pycache__

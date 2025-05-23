@@ -1,29 +1,38 @@
 import torch
-from transformers import GPT2Tokenizer, GPT2Model
+from transformers import AutoTokenizer, AutoModel, GPT2Tokenizer, GPT2Model
 from typing import Iterable, Optional
 import numpy as np
 from pathlib import Path
 
 class WernickesArea:
-    """Front half of GPT-2 used for semantic encoding.
+    """Front half of GPT-2 (or alternative model) used for semantic encoding.
 
-    The language modeling head is discarded so only hidden state
-    embeddings are produced. Tokens are transient and never kept in
-    memory after encoding.
+    The language modeling head is discarded so only hidden state embeddings are
+    produced. Tokens are transient and never kept in memory after encoding.
     """
 
     def __init__(self, model_dir: str, device: str = "cpu", token_table_path: Optional[str] = None):
-        self.tokenizer = GPT2Tokenizer.from_pretrained(model_dir)
-        # ``GPT2Tokenizer`` does not define a padding token by default which
-        # breaks batching when ``padding=True`` is requested.  Use the EOS token
-        # as padding to keep sequence length consistent across calls.
-        if self.tokenizer.pad_token is None:
+        # Load tokenizer using ``AutoTokenizer`` to allow non-GPT models.
+        self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
+        # Some tokenizers may not define a padding token which breaks batching
+        # when ``padding=True`` is requested.  Use the EOS token as padding to
+        # keep sequence length consistent across calls.
+        if self.tokenizer.pad_token is None and self.tokenizer.eos_token is not None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        self.model = GPT2Model.from_pretrained(model_dir)
+        # ``AutoModel`` can load both GPT-2 and alternative embedding models.
+        self.model = AutoModel.from_pretrained(model_dir)
         self.model.to(device)
         self.model.eval()
         self.device = device
+
+        # Determine embedding dimension reported by the model config.
+        self.embed_dim = getattr(self.model.config, "n_embd", getattr(self.model.config, "hidden_size", 768))
+        # Project to 768-dim if the model uses a different size so downstream
+        # modules remain compatible with GPT-2 embeddings.
+        self.proj = None
+        if self.embed_dim != 768:
+            self.proj = torch.nn.Linear(self.embed_dim, 768, bias=False, device=device)
 
         self.token_table: Optional[torch.Tensor] = None
         if token_table_path:
@@ -57,6 +66,8 @@ class WernickesArea:
         ).to(self.device)
         outputs = self.model(**tokens)
         hidden = outputs.last_hidden_state
+        if self.proj is not None:
+            hidden = self.proj(hidden)
         del tokens  # ensure tokens don't persist
         return hidden
 
