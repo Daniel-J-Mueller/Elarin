@@ -147,7 +147,7 @@ class MotorCortex(nn.Module):
         temperature: float | None = None,
         num_candidates: int | None = None,
         valence_fn: "Callable[[torch.Tensor], torch.Tensor] | None" = None,
-    ) -> tuple[str, torch.Tensor, torch.Tensor, int, list[str]]:
+    ) -> tuple[str, torch.Tensor, torch.Tensor, torch.Tensor, int, list[str]]:
         """Return the token whose embedding best matches ``hidden``.
 
         When the precomputed token table is available, similarity against the
@@ -174,11 +174,12 @@ class MotorCortex(nn.Module):
         Returns
         -------
         tuple
-            ``(text, chosen_emb, all_embs, index, texts)`` where ``text`` is the
-            selected string, ``chosen_emb`` is its embedding, ``all_embs`` are
-            embeddings for every candidate, ``index`` is the chosen candidate's
-            position within ``all_embs`` and ``texts`` contains every
-            speculative token.
+            ``(text, emb, feedback_emb, all_embs, index, texts)`` where ``text``
+            is the emitted string, ``emb`` is its embedding, ``feedback_emb`` is
+            the embedding of the runner up token used for feedback,
+            ``all_embs`` are embeddings for every candidate, ``index`` is the
+            chosen candidate's position within ``all_embs`` and ``texts``
+            contains every speculative token.
         """
 
         temp = temperature
@@ -189,6 +190,8 @@ class MotorCortex(nn.Module):
                 temp = 1.0
 
         n = num_candidates if num_candidates is not None else self.num_candidates
+        if self.wernicke.token_table is not None:
+            n = max(2, n)
 
         # Apply adaptive dampening to the hidden state
         hidden = hidden.to(self.device)
@@ -219,8 +222,11 @@ class MotorCortex(nn.Module):
             if valence_fn is not None:
                 val = valence_fn(enc)
                 scores = scores + val
-            best_idx = int(torch.argmax(scores).item())
+            order = torch.argsort(scores, descending=True)
+            best_idx = int(order[0].item())
+            fb_idx = int(order[1].item()) if order.numel() > 1 else best_idx
             best_text = texts[best_idx]
+            fb_text = texts[fb_idx]
         else:
             # Fall back to sampling via Broca's area when no table is available
             candidates = list(
@@ -248,8 +254,11 @@ class MotorCortex(nn.Module):
             if valence_fn is not None:
                 val = valence_fn(enc)
                 scores = scores + val
-            best_idx = int(torch.argmax(scores).item())
+            order = torch.argsort(scores, descending=True)
+            best_idx = int(order[0].item())
+            fb_idx = int(order[1].item()) if order.numel() > 1 else best_idx
             best_text = texts[best_idx]
+            fb_text = texts[fb_idx]
 
         # update history of produced tokens
         if ids:
@@ -258,14 +267,26 @@ class MotorCortex(nn.Module):
             if len(self.history) > self.history_size:
                 self.history.pop(0)
             self.curiosity.update(tok_id)
+            fb_id = ids[fb_idx]
+        else:
+            tok_id = -1
+            fb_id = -1
 
         self.logger.info(best_text, extra={"token_id": tok_id})
         chosen_emb = enc[best_idx : best_idx + 1]
-        self._recent.append((time.time(), tok_id, hidden.detach().cpu(), chosen_emb.detach().cpu()))
+        fb_emb = enc[fb_idx : fb_idx + 1]
+        self._recent.append(
+            (
+                time.time(),
+                tok_id,
+                hidden.detach().cpu(),
+                chosen_emb.detach().cpu(),
+            )
+        )
         self._trim_recent()
         if self.ifg is not None:
             self.ifg.record_output(hidden)
-        return best_text, chosen_emb, enc, best_idx, texts
+        return best_text, chosen_emb, fb_emb, enc, best_idx, texts
 
     @torch.no_grad()
     def learn_from_feedback(
