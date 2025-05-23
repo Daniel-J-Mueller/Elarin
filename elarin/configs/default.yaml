@@ -18,6 +18,12 @@ models:
   clip: models/clip-vit-b32
   whisper: models/whisper-small
   gpt2: models/gpt2
+  nomic: models/nomic-embed-text-v2-moe
+
+# Embedding model options:
+# 1 - gpt2
+# 2 - nomic-ai/nomic-embed-text-v2-moe
+embedding_model: 1
 
 # Directory for saving learned state
 persistent_dir: persistent
