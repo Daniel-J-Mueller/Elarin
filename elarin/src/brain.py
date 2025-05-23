@@ -776,9 +776,11 @@ def main(argv: list[str] | None = None) -> None:
                 else:
                     out_text = ""
                     out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])
+                    fb_aug = torch.zeros_like(out_aug)
             else:
                 out_text = ""
                 out_aug = torch.zeros(1, 768, device=devices["motor_cortex"])
+                fb_aug = torch.zeros_like(out_aug)
             if out_text:
                 silent_steps = 0
             else:
