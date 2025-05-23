@@ -1,10 +1,15 @@
 import threading
+
 import numpy as np
 import sounddevice as sd
 
 
 class AudioBuffer:
-    """Continuous microphone capture with a small ring buffer."""
+    """Continuous microphone capture with a small ring buffer.
+
+    The buffer stores a fixed number of samples.  When more audio than the
+    capacity is injected at once only the most recent portion is kept.
+    """
 
     def __init__(
         self,
@@ -66,6 +71,10 @@ class AudioBuffer:
         n = len(audio)
         if n == 0:
             return
+        # Only keep the most recent ``capacity`` samples to avoid overflow
+        if n > self.capacity:
+            audio = audio[-self.capacity :]
+            n = self.capacity
         with self.lock:
             pos = self.write_pos
             end = pos + n
@@ -80,4 +89,3 @@ class AudioBuffer:
     def close(self) -> None:
         self.stream.stop()
         self.stream.close()
-
