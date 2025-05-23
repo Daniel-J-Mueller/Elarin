@@ -28,6 +28,7 @@ elarin/
    python -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
+   sudo apt-get install -y espeak-ng
    ```
 
 2. **Download Base Models**
@@ -152,9 +153,10 @@ When ``model_timing_debug`` is ``true`` Elarin records the time spent in
 each brain region's inference step to ``logs/model_timing_debug.log``. This
 can be used to spot slow components during development.
 
-Setting ``TTS`` to ``true`` enables speech synthesis of motor outputs using the
-``hexgrad/Kokoro-82M`` model. The resulting audio is played aloud and also fed
-back into the cochlea so Elarin can hear her own voice.
+Setting ``TTS`` to ``true`` enables speech synthesis of motor outputs via the
+``kokoro`` library and the ``hexgrad/Kokoro-82M`` model. Ensure
+``espeak-ng`` is installed for audio playback. The resulting audio is played
+aloud and also fed back into the cochlea so Elarin can hear her own voice.
 
 The motor cortex now predicts the likely valence of each speculative
 token using hippocampal recall and the amygdala before choosing which

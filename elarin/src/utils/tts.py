@@ -1,21 +1,46 @@
 import numpy as np
 import torch
-from transformers import pipeline
+from kokoro import KPipeline
 
 class KokoroTTS:
-    """Simple wrapper around the hexgrad/Kokoro-82M text-to-speech model."""
+    """Wrapper around the hexgrad/Kokoro-82M text-to-speech model."""
 
-    def __init__(self, model_dir: str, device: str = "cpu", samplerate: int = 16000) -> None:
-        device_idx = 0 if device.startswith("cuda") else -1
-        self.pipe = pipeline("text-to-speech", model=model_dir, device=device_idx)
+    def __init__(
+        self,
+        model_dir: str,
+        device: str = "cpu",
+        samplerate: int = 24000,
+        voice: str = "kokoro",
+    ) -> None:
+        """Initialise the Kokoro TTS pipeline.
+
+        Parameters
+        ----------
+        model_dir:
+            Path to the downloaded ``hexgrad/Kokoro-82M`` model directory.
+        device:
+            PyTorch device identifier.
+        samplerate:
+            Target audio sample rate.
+        voice:
+            Voice preset to use when generating speech.
+        """
+
+        self.pipe = KPipeline(model_path=model_dir, device=device, lang_code="a")
         self.sample_rate = samplerate
+        self.voice = voice
 
     @torch.no_grad()
     def synthesize(self, text: str) -> np.ndarray:
         if not text:
             return np.zeros(0, dtype=np.float32)
-        output = self.pipe(text)
-        audio = output["audio"]
-        if isinstance(audio, torch.Tensor):
-            audio = audio.cpu().numpy()
-        return audio.astype(np.float32)
+        chunks = []
+        for _, _, audio in self.pipe(text, voice=self.voice):
+            if isinstance(audio, torch.Tensor):
+                audio = audio.cpu().numpy()
+            chunks.append(audio)
+        if chunks:
+            audio_arr = np.concatenate(chunks)
+        else:
+            audio_arr = np.zeros(0, dtype=np.float32)
+        return audio_arr.astype(np.float32)
