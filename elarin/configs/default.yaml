@@ -52,4 +52,4 @@ settings:
   ifg_feedback_buffer: 30  # seconds that inhibition feedback remains active
   gpu_debug: true
   model_timing_debug: true
-  TTS: true
+  TTS: false
