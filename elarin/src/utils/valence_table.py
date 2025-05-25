@@ -44,6 +44,13 @@ DEFAULT_PHRASES: Dict[str, List[str]] = {
         "I'm sorry",
         "I hurt them",
     ],
+    "incorrect": [
+        "that's innacurate",
+        "not true",
+        "wrong",
+        "not factual",
+        "opposite",
+    ]
 }
 
 
