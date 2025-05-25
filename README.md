@@ -148,10 +148,11 @@ lower value forgets feedback more quickly.
 When ``gpu_debug`` is set ``true`` the brain logs the memory footprint of
 each major model to ``logs/GPU_debug.log`` during startup. This helps
 identify which components consume the most VRAM on multi‑GPU systems.
-
 When ``model_timing_debug`` is ``true`` Elarin records the time spent in
 each brain region's inference step to ``logs/model_timing_debug.log``. This
 can be used to spot slow components during development.
+``serotonin_baseline`` sets the target serotonin level for hormonal
+homeostasis (default ``0.5``) so recovery accelerates when levels drift.
 
 Setting ``TTS`` to ``true`` enables speech synthesis of motor outputs via the
 ``kokoro`` library and the ``hexgrad/Kokoro-82M`` model. Ensure

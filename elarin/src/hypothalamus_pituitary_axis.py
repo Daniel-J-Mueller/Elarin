@@ -20,7 +20,7 @@ class HypothalamusPituitaryAxis:
         habituation_recovery: float = 0.02,
         habituation_threshold: float = 0.92,
         trend_rate: float = 0.05,
-        serotonin_baseline: float = 0.7,
+        serotonin_baseline: float = 0.5,
     ) -> None:
         self.dopamine = 0.0
         self.norepinephrine = 0.0
@@ -46,8 +46,9 @@ class HypothalamusPituitaryAxis:
         self.memory_var = 1e-6
 
     def _apply_homeostasis(self) -> None:
-        """Subtly drift serotonin toward the configured baseline."""
-        self.serotonin += 0.02 * (self.serotonin_baseline - self.serotonin)
+        """Drift serotonin toward the configured baseline with adaptive speed."""
+        diff = self.serotonin_baseline - self.serotonin
+        self.serotonin += 0.02 * diff + 0.04 * diff * abs(diff)
         self.serotonin = max(0.0, min(1.0, self.serotonin))
 
     def step(self, novelty: float, error: float) -> None:
@@ -77,7 +78,7 @@ class HypothalamusPituitaryAxis:
 
         self.dopamine = 0.9 * self.dopamine + novelty_delta
         self.norepinephrine = 0.85 * self.norepinephrine + error_delta
-        self.serotonin = 0.99 * self.serotonin - 0.02 * novelty_delta
+        self.serotonin = 0.995 * self.serotonin - 0.02 * novelty_delta
         self.oxytocin = 0.995 * self.oxytocin
         self.acetylcholine = 0.9 * self.acetylcholine + abs(
             novelty_delta - error_delta
