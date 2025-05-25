@@ -20,7 +20,7 @@ class HypothalamusPituitaryAxis:
         habituation_recovery: float = 0.02,
         habituation_threshold: float = 0.92,
         trend_rate: float = 0.05,
-        serotonin_baseline: float = 0.5,
+        serotonin_baseline: float = 0.7,
     ) -> None:
         self.dopamine = 0.0
         self.norepinephrine = 0.0
@@ -184,7 +184,7 @@ class HypothalamusPituitaryAxis:
         delta = (usage_gb - self.memory_avg) / (self.memory_var**0.5 + 1e-6)
 
         if delta > 0:
-            self.serotonin = 0.98 * self.serotonin + 0.02 * delta
+            self.serotonin = 0.98 * self.serotonin + 0.05 * delta
             self.dopamine = 0.98 * self.dopamine - 0.02 * delta
             self.serotonin = max(0.0, min(1.0, self.serotonin))
             self.dopamine = max(0.0, min(1.0, self.dopamine))
