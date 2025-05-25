@@ -20,6 +20,7 @@ class HypothalamusPituitaryAxis:
         habituation_recovery: float = 0.02,
         habituation_threshold: float = 0.92,
         trend_rate: float = 0.05,
+        serotonin_baseline: float = 0.5,
     ) -> None:
         self.dopamine = 0.0
         self.norepinephrine = 0.0
@@ -35,6 +36,7 @@ class HypothalamusPituitaryAxis:
         self.prev_intero: torch.Tensor | None = None
 
         self.trend_rate = trend_rate
+        self.serotonin_baseline = serotonin_baseline
         self.novelty_avg = 0.0
         self.novelty_var = 1e-6
         self.error_avg = 0.0
@@ -42,6 +44,11 @@ class HypothalamusPituitaryAxis:
         self.baseline_avg = 0.0
         self.memory_avg = 0.0
         self.memory_var = 1e-6
+
+    def _apply_homeostasis(self) -> None:
+        """Subtly drift serotonin toward the configured baseline."""
+        self.serotonin += 0.02 * (self.serotonin_baseline - self.serotonin)
+        self.serotonin = max(0.0, min(1.0, self.serotonin))
 
     def step(self, novelty: float, error: float) -> None:
         """Update hormones using trend-adjusted novelty and error."""
@@ -82,6 +89,8 @@ class HypothalamusPituitaryAxis:
         self.oxytocin = max(0.0, min(1.0, self.oxytocin))
         self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
 
+        self._apply_homeostasis()
+
     def filter_intero(self, emb: torch.Tensor) -> torch.Tensor:
         """Attenuate repetitive motor embeddings.
 
@@ -121,6 +130,7 @@ class HypothalamusPituitaryAxis:
         self.serotonin = max(0.0, min(1.0, self.serotonin))
         self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
         self.oxytocin = max(0.0, min(1.0, self.oxytocin))
+        self._apply_homeostasis()
 
     def adjust_inhibition(self, baseline: float) -> None:
         """Modify hormone levels based on subthalamic nucleus baseline.
@@ -145,6 +155,7 @@ class HypothalamusPituitaryAxis:
 
         self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
         self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
+        self._apply_homeostasis()
 
     def log_levels(self, logger: "logging.Logger") -> None:
         """Emit current hormone levels to ``logger``."""
@@ -177,3 +188,4 @@ class HypothalamusPituitaryAxis:
             self.dopamine = 0.98 * self.dopamine - 0.02 * delta
             self.serotonin = max(0.0, min(1.0, self.serotonin))
             self.dopamine = max(0.0, min(1.0, self.dopamine))
+        self._apply_homeostasis()
