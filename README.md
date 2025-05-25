@@ -59,8 +59,9 @@ The script downloads the following models sequentially:
 
 4. **Generate Valence Embeddings**
 
-   Create a small table of positive and negative phrases used when assessing
-   emotional valence. The resulting file is ``elarin/persistent/valence.npy``.
+   Create a small table of positive, negative, affection and incorrect phrases
+   used when assessing emotional valence. The resulting file is
+   ``elarin/persistent/valence.npy``.
 
    ```bash
    python elarin/src/utils/valence_table.py
@@ -120,6 +121,9 @@ displays the live camera feed with an audio level meter and text overlay.
 Press ``Ctrl+C`` to stop the brain.
 Click the **Treat** button at the bottom of the viewer to give positive feedback
 and boost dopamine levels.
+Spoken feedback is also matched against the valence phrases so saying
+"good job" raises dopamine, while phrases like "that's incorrect" boost
+norepinephrine.
 
 The ``settings`` section of ``configs/default.yaml`` now includes
 ``motor_candidates`` which controls how many speculative tokens the motor
