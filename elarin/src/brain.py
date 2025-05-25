@@ -2,6 +2,7 @@
 
 from PIL import Image
 import torch
+import torch.nn.functional as F
 torch.backends.cudnn.benchmark = True
 import cv2
 import numpy as np
@@ -168,10 +169,15 @@ def main(argv: list[str] | None = None) -> None:
             torch.tensor(table.get("affection"), device=devices["dmn"])
             .mean(dim=0, keepdim=True)
         )
+        incorrect_emb = (
+            torch.tensor(table.get("incorrect"), device=devices["dmn"])
+            .mean(dim=0, keepdim=True)
+        )
     else:
         like_emb = torch.zeros(1, 768, device=devices["dmn"])
         dislike_emb = torch.zeros(1, 768, device=devices["dmn"])
         love_emb = torch.zeros(1, 768, device=devices["dmn"])
+        incorrect_emb = torch.zeros(1, 768, device=devices["dmn"])
 
     sup_parietal = SuperiorParietalLobule(
         device=devices["dmn"], persist_path=f"{persist_dir}/superior_parietal_lobule.pt"
@@ -620,8 +626,18 @@ def main(argv: list[str] | None = None) -> None:
                 if audio_feat.dim() == 3:
                     audio_feat = audio_feat.mean(dim=1)
             if spoken:
-                with log_timing("wernickes_area", "inference", timing_debug, log_dir):
+                with log_timing(
+                    "wernickes_area",
+                    "inference",
+                    timing_debug,
+                    log_dir,
+                ):
                     text_emb = wernicke.encode([spoken]).mean(dim=1)
+                pos_v = F.cosine_similarity(text_emb, like_emb, dim=1).item()
+                neg_v = F.cosine_similarity(text_emb, dislike_emb, dim=1).item()
+                aff_v = F.cosine_similarity(text_emb, love_emb, dim=1).item()
+                incor_v = F.cosine_similarity(text_emb, incorrect_emb, dim=1).item()
+                axis.update_valence(pos_v - neg_v - incor_v, affection=aff_v)
                 temporal.clear()
             else:
                 text_emb = torch.zeros(
@@ -629,7 +645,10 @@ def main(argv: list[str] | None = None) -> None:
                     wernicke.model.config.n_embd,
                     device=wernicke.device,
                 )
+                pos_v = neg_v = aff_v = incor_v = 0.0
             user_emb = augmenter(text_emb)
+            if incor_v > 0.0:
+                user_emb = user_emb + incor_v * incorrect_emb.to(user_emb.device)
             spec_emb = temporal.embedding(wernicke)
             spec_emb = augmenter(spec_emb)
             if spoken:
@@ -815,10 +834,13 @@ def main(argv: list[str] | None = None) -> None:
 
             insula_emb = insula(out_aug)
             valence = amygdala.evaluate(context)
+            valence += pos_v - neg_v - incor_v
             pain_mod = cingulate.modulate(torch.tensor([[valence]]))
             axis.dopamine = max(0.0, min(1.0, axis.dopamine + midbrain.adjust(context)))
             ctx_store = entorhinal.funnel(context)
             ctx_store = dentate.encode(ctx_store)
+            if incor_v > 0.0:
+                ctx_store = ctx_store + incor_v * entorhinal.funnel(incorrect_emb)
             hippocampus.add_episode(
                 {
                     "vision": vision.squeeze(0).detach().cpu().numpy(),
