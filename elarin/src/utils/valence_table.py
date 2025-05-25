@@ -39,6 +39,10 @@ DEFAULT_PHRASES: Dict[str, List[str]] = {
     ],
     "affection": [
         "I love this",
+        "I like this",
+        "Aw",
+        "I'm sorry",
+        "I hurt them",
     ],
 }
 
