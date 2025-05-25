@@ -30,7 +30,13 @@ class Viewer:
             self.width - 70, self.height + 5, 65, self.bar_height - 10
         )
 
-    def update(self, frame: np.ndarray, text: str = "", audio_level: float = 0.0) -> None:
+    def update(
+        self,
+        frame: np.ndarray,
+        text: str = "",
+        audio_level: float = 0.0,
+        hormones: Optional[dict[str, float]] = None,
+    ) -> None:
         surface = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
         # Scale the surface so the entire image fits inside the viewer window
         if surface.get_width() != self.width or surface.get_height() != self.height:
@@ -49,6 +55,12 @@ class Viewer:
                 # fall back to a placeholder to avoid crashing on odd tokens
                 txt_surf = self.font.render("[?]", True, (255, 255, 255))
             self.screen.blit(txt_surf, (5, self.height + 5))
+        if hormones:
+            levels = " ".join(
+                f"{k[0].upper()}:" + f"{float(v):.2f}" for k, v in hormones.items()
+            )
+            lvl_surf = self.font.render(levels, True, (255, 255, 0))
+            self.screen.blit(lvl_surf, (5, 5))
         if self.input_buffer:
             input_surf = self.font.render(self.input_buffer, True, (255, 255, 255))
             self.screen.blit(input_surf, (5, self.height + self.bar_height + 5))

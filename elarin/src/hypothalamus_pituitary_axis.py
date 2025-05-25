@@ -140,6 +140,12 @@ class HypothalamusPituitaryAxis:
         self.oxytocin = max(0.0, min(1.0, self.oxytocin))
         self._apply_homeostasis()
 
+    def penalize_incorrect(self, strength: float) -> None:
+        """Lower dopamine when the user indicates something is incorrect."""
+        scale = max(0.0, min(1.0, float(strength)))
+        self.dopamine *= 1.0 - 0.4 * scale
+        self.dopamine = max(0.0, self.dopamine)
+
     def adjust_inhibition(self, baseline: float) -> None:
         """Modify hormone levels based on subthalamic nucleus baseline.
 

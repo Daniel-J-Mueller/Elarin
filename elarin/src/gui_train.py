@@ -51,6 +51,7 @@ class GUITrain(logging.Handler):
         self.last_frame = np.zeros((height, width, 3), dtype=np.uint8)
         self.last_text = ""
         self.last_audio = 0.0
+        self.last_hormones: dict[str, float] = {}
 
     # ``logging.Handler`` override
     def emit(self, record: logging.LogRecord) -> None:  # type: ignore[override]
@@ -70,10 +71,17 @@ class GUITrain(logging.Handler):
         while self.context and self.context[0][0] < cutoff:
             self.context.popleft()
 
-    def update(self, frame: np.ndarray, text: str = "", audio_level: float = 0.0) -> None:
+    def update(
+        self,
+        frame: np.ndarray,
+        text: str = "",
+        audio_level: float = 0.0,
+        hormones: Optional[dict[str, float]] = None,
+    ) -> None:
         self.last_frame = frame
         self.last_text = text
         self.last_audio = audio_level
+        self.last_hormones = hormones or {}
         self.draw()
 
     def draw(self) -> None:
@@ -94,6 +102,12 @@ class GUITrain(logging.Handler):
             surf = self.font.render(line, True, (255, 255, 255))
             self.screen.blit(surf, (5, y))
             y += self.font.get_height()
+        if self.last_hormones:
+            levels = " ".join(
+                f"{k[0].upper()}:" + f"{float(v):.2f}" for k, v in self.last_hormones.items()
+            )
+            lvl_surf = self.font.render(levels, True, (255, 255, 0))
+            self.screen.blit(lvl_surf, (self.log_w + 5, 2))
 
         # message log box
         pygame.draw.rect(
