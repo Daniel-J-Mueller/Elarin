@@ -27,14 +27,14 @@ DEFAULT_PHRASES: Dict[str, List[str]] = {
         "well done",
         "that is great",
         "I like this",
-        "excellent work",
-        "pleased with that",
+        "nice!",
+        "good job",
     ],
     "negative": [
         "that's bad",
         "I dislike this",
         "not good",
-        "terrible idea",
+        "please don't",
         "stop that",
     ],
     "affection": [
