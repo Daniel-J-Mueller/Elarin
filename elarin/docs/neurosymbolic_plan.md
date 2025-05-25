@@ -62,7 +62,9 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 - Measure the impact of modality filtering and the unified Cochlea on reaction time, then refine the executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
 - Stress-test the ``DistributedHippocampus`` using the new memory usage reports and refine salience gating to prevent overload【F:human_brain_components_reference.txt†L108-L113】.
-- Split the hippocampus into left and right hemispheres running on separate GPUs so each half stores unique episodes and recall averages their responses through the corpus callosum【F:human_brain_components_reference.txt†L11-L14】.
+- **Implemented:** the hippocampus now supports multiple hemispheres via the
+  ``cerebral_hemispheres`` setting so each side retains its own memories while
+  sharing recall through the corpus callosum【F:human_brain_components_reference.txt†L11-L14】.
 - Evaluate the new ``memory_pressure`` hook that raises serotonin and lowers dopamine as the hippocampus fills, ensuring stable neurotransmitter levels. Hormone levels are logged alongside the subthalamic baseline for later analysis【F:human_brain_components_reference.txt†L246-L250】.
 - Introduce a small ``serotonin_baseline`` parameter in ``HypothalamusPituitaryAxis`` so levels drift back toward typical values, preventing depressive states when novelty stays low【F:human_brain_components_reference.txt†L190-L208】.
 - Extend the basal ganglia into explicit caudate/putamen/pallidus/accumbens/nigra modules so action selection aligns with biological circuits.【F:human_brain_components_reference.txt†L219-L245】
@@ -103,5 +105,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
   improve speech quality and allow future voice customisation.
 - Added a dedicated `devices.kokoro_tts` entry so speech synthesis can run on
   its own GPU (default `cuda:3`).
+- Introduced a configurable `cerebral_hemispheres` option so multiple
+  hippocampal hemispheres can be enabled. Additional hemispheres operate like
+  the right hemisphere, meaning Broca's area is not duplicated【F:human_brain_components_reference.txt†L21-L27】【F:human_brain_components_reference.txt†L65-L66】.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.

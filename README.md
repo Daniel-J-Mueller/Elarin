@@ -128,8 +128,11 @@ possible outputs while only printing the highest-probability token.
 The ``embedding_model`` option at the top of the file chooses which
 text encoder to use (``1`` for GPT-2, ``2`` for the Nomic model).
 ``hippocampus_shards`` sets the number of memory shards to use and
-``hippocampus_independent`` determines whether each shard stores unique
-episodes (mimicking left and right hemispheres) or mirrors the same data.
+``cerebral_hemispheres`` chooses how many hippocampal hemispheres are active
+(each additional hemisphere behaves like a right hemisphere so language regions
+are not duplicated). ``hippocampus_shards`` sets the number of memory shards
+per hemisphere and ``hippocampus_independent`` determines whether each shard
+stores unique episodes or mirrors the same data.
 ``neurogenesis`` can also be enabled to automatically seed blank region
 weights using Kaiming initialization whenever no trained parameters are
 found. This option is primarily useful the first time you run Elarin or
