@@ -42,7 +42,7 @@ settings:
   # Capacity of episodic memory buffer
   hippocampus_capacity: 1000000
   hippocampus_recall_threshold: 0.2
-  hippocampus_shards: 2
+  hippocampus_shards: 1
   hippocampus_independent: true
   hippocampus_salience_threshold: 0.0
   # Number of speculative motor tokens to generate per step (debug mode)
