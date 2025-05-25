@@ -53,3 +53,5 @@ settings:
   gpu_debug: true
   model_timing_debug: true
   TTS: false
+
+  serotonin_baseline: 0.5
