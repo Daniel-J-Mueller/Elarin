@@ -67,6 +67,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   sharing recall through the corpus callosum【F:human_brain_components_reference.txt†L11-L14】.
 - Evaluate the new ``memory_pressure`` hook that raises serotonin and lowers dopamine as the hippocampus fills, ensuring stable neurotransmitter levels. Hormone levels are logged alongside the subthalamic baseline for later analysis【F:human_brain_components_reference.txt†L246-L250】.
 - Introduce a small ``serotonin_baseline`` parameter in ``HypothalamusPituitaryAxis`` so levels drift back toward typical values, preventing depressive states when novelty stays low【F:human_brain_components_reference.txt†L190-L208】.
+- Add a matching ``dopamine_baseline`` so reward levels stabilise around 0.5 when no feedback is present.
 - Extend the basal ganglia into explicit caudate/putamen/pallidus/accumbens/nigra modules so action selection aligns with biological circuits.【F:human_brain_components_reference.txt†L219-L245】
 - Add an ``approve_action`` stage using the caudate nucleus, globus pallidus and
   subthalamic nucleus to suppress repetitive motor commands and keep the output

@@ -21,8 +21,9 @@ class HypothalamusPituitaryAxis:
         habituation_threshold: float = 0.92,
         trend_rate: float = 0.05,
         serotonin_baseline: float = 0.5,
+        dopamine_baseline: float = 0.5,
     ) -> None:
-        self.dopamine = 0.0
+        self.dopamine = dopamine_baseline
         self.norepinephrine = 0.0
         self.serotonin = 0.0
         self.acetylcholine = 0.0
@@ -37,6 +38,7 @@ class HypothalamusPituitaryAxis:
 
         self.trend_rate = trend_rate
         self.serotonin_baseline = serotonin_baseline
+        self.dopamine_baseline = dopamine_baseline
         self.novelty_avg = 0.0
         self.novelty_var = 1e-6
         self.error_avg = 0.0
@@ -49,10 +51,13 @@ class HypothalamusPituitaryAxis:
         """Drift hormones toward baseline levels to prevent saturation."""
         diff = self.serotonin_baseline - self.serotonin
         self.serotonin += 0.02 * diff + 0.04 * diff * abs(diff)
+        d_diff = self.dopamine_baseline - self.dopamine
+        self.dopamine += 0.05 * d_diff + 0.1 * d_diff * abs(d_diff)
         # Mild decay for excitatory hormones
         self.norepinephrine *= 0.99
         self.acetylcholine *= 0.99
         self.serotonin = max(0.0, min(1.0, self.serotonin))
+        self.dopamine = max(0.0, min(1.0, self.dopamine))
         self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
         self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
 

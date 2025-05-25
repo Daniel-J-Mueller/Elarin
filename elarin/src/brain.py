@@ -99,6 +99,7 @@ def main(argv: list[str] | None = None) -> None:
     timing_debug = bool(settings.get("model_timing_debug", False))
     tts_enabled = bool(settings.get("TTS", False))
     serotonin_baseline = float(settings.get("serotonin_baseline", 0.5))
+    dopamine_baseline = float(settings.get("dopamine_baseline", 0.5))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -312,7 +313,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     if gpu_debug:
         models_for_profile.append((corpus, "corpus_callosum"))
-    axis = HypothalamusPituitaryAxis(serotonin_baseline=serotonin_baseline)
+    axis = HypothalamusPituitaryAxis(
+        serotonin_baseline=serotonin_baseline,
+        dopamine_baseline=dopamine_baseline,
+    )
     pituitary = PituitaryGland(device=devices["dmn"], persist_path=f"{persist_dir}/pituitary_gland.pt")
     maybe_initialize(
         pituitary,
