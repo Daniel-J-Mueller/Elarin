@@ -633,10 +633,10 @@ def main(argv: list[str] | None = None) -> None:
                     log_dir,
                 ):
                     text_emb = wernicke.encode([spoken]).mean(dim=1)
-                pos_v = F.cosine_similarity(text_emb, like_emb, dim=1).item()
-                neg_v = F.cosine_similarity(text_emb, dislike_emb, dim=1).item()
-                aff_v = F.cosine_similarity(text_emb, love_emb, dim=1).item()
-                incor_v = F.cosine_similarity(text_emb, incorrect_emb, dim=1).item()
+                pos_v = F.cosine_similarity(text_emb, like_emb.to(text_emb.device), dim=1).item()
+                neg_v = F.cosine_similarity(text_emb, dislike_emb.to(text_emb.device), dim=1).item()
+                aff_v = F.cosine_similarity(text_emb, love_emb.to(text_emb.device), dim=1).item()
+                incor_v = F.cosine_similarity(text_emb, incorrect_emb.to(text_emb.device), dim=1).item()
                 axis.update_valence(pos_v - neg_v - incor_v, affection=aff_v)
                 temporal.clear()
             else:
