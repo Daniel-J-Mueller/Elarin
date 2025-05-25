@@ -84,6 +84,7 @@ def main(argv: list[str] | None = None) -> None:
     hippocampus_capacity = int(settings.get("hippocampus_capacity", 1000))
     recall_threshold = float(settings.get("hippocampus_recall_threshold", 0.0))
     hippocampus_shards = int(settings.get("hippocampus_shards", 1))
+    cerebral_hemispheres = int(settings.get("cerebral_hemispheres", 1))
     hippocampus_independent = bool(settings.get("hippocampus_independent", False))
     salience_thresh = float(
         settings.get("hippocampus_salience_threshold", 0.0)
@@ -219,14 +220,15 @@ def main(argv: list[str] | None = None) -> None:
         "motor": 768,
         "speech": 768,
     }
-    if hippocampus_shards > 1:
+    total_shards = hippocampus_shards * cerebral_hemispheres
+    if total_shards > 1:
         shard_paths = [
             f"{persist_dir}/hippocampus_memory_shard_{i}.npz"
-            for i in range(hippocampus_shards)
+            for i in range(total_shards)
         ]
         hippocampus = DistributedHippocampus(
             hip_dims,
-            num_shards=hippocampus_shards,
+            num_shards=total_shards,
             shard_paths=shard_paths,
             independent=hippocampus_independent,
             capacity=hippocampus_capacity,
