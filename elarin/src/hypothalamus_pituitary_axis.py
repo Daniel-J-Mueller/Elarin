@@ -46,10 +46,15 @@ class HypothalamusPituitaryAxis:
         self.memory_var = 1e-6
 
     def _apply_homeostasis(self) -> None:
-        """Drift serotonin toward the configured baseline with adaptive speed."""
+        """Drift hormones toward baseline levels to prevent saturation."""
         diff = self.serotonin_baseline - self.serotonin
         self.serotonin += 0.02 * diff + 0.04 * diff * abs(diff)
+        # Mild decay for excitatory hormones
+        self.norepinephrine *= 0.99
+        self.acetylcholine *= 0.99
         self.serotonin = max(0.0, min(1.0, self.serotonin))
+        self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
+        self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
 
     def step(self, novelty: float, error: float) -> None:
         """Update hormones using trend-adjusted novelty and error."""
@@ -74,7 +79,9 @@ class HypothalamusPituitaryAxis:
         novelty_delta = (novelty - self.novelty_avg) / (
             self.novelty_var**0.5 + 1e-6
         )
+        novelty_delta = max(-1.0, min(1.0, novelty_delta))
         error_delta = (error - self.error_avg) / (self.error_var**0.5 + 1e-6)
+        error_delta = max(-1.0, min(1.0, error_delta))
 
         self.dopamine = 0.9 * self.dopamine + novelty_delta
         self.norepinephrine = 0.85 * self.norepinephrine + error_delta
@@ -146,6 +153,7 @@ class HypothalamusPituitaryAxis:
             1 - self.trend_rate
         ) * self.baseline_avg + self.trend_rate * baseline
         delta = baseline - self.baseline_avg
+        delta = max(-1.0, min(1.0, delta))
 
         self.norepinephrine = (
             0.98 * self.norepinephrine + 0.02 * baseline + 0.05 * delta
@@ -183,6 +191,7 @@ class HypothalamusPituitaryAxis:
             1 - self.trend_rate
         ) * self.memory_var + self.trend_rate * (usage_gb - self.memory_avg) ** 2
         delta = (usage_gb - self.memory_avg) / (self.memory_var**0.5 + 1e-6)
+        delta = max(-1.0, min(1.0, delta))
 
         if delta > 0:
             self.serotonin = 0.98 * self.serotonin + 0.05 * delta
