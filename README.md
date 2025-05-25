@@ -161,6 +161,8 @@ each brain region's inference step to ``logs/model_timing_debug.log``. This
 can be used to spot slow components during development.
 ``serotonin_baseline`` sets the target serotonin level for hormonal
 homeostasis (default ``0.5``) so recovery accelerates when levels drift.
+``dopamine_baseline`` performs the same role for dopamine so levels quickly
+return toward ``0.5`` when no reinforcement is present.
 Norepinephrine and acetylcholine now also decay slowly toward zero each
 step to avoid runaway activation.
 

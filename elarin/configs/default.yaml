@@ -56,3 +56,4 @@ settings:
   TTS: false
 
   serotonin_baseline: 0.5
+  dopamine_baseline: 0.5

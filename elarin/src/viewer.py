@@ -56,11 +56,15 @@ class Viewer:
                 txt_surf = self.font.render("[?]", True, (255, 255, 255))
             self.screen.blit(txt_surf, (5, self.height + 5))
         if hormones:
-            levels = " ".join(
-                f"{k[0].upper()}:" + f"{float(v):.2f}" for k, v in hormones.items()
-            )
-            lvl_surf = self.font.render(levels, True, (255, 255, 0))
+            items = [f"{k[0].upper()}:{float(v):.2f}" for k, v in hormones.items()]
+            half = len(items) // 2 + len(items) % 2
+            top = " ".join(items[:half])
+            bottom = " ".join(items[half:])
+            lvl_surf = self.font.render(top, True, (255, 255, 0))
             self.screen.blit(lvl_surf, (5, 5))
+            if bottom:
+                lvl_surf2 = self.font.render(bottom, True, (255, 255, 0))
+                self.screen.blit(lvl_surf2, (5, 25))
         if self.input_buffer:
             input_surf = self.font.render(self.input_buffer, True, (255, 255, 255))
             self.screen.blit(input_surf, (5, self.height + self.bar_height + 5))
