@@ -162,9 +162,14 @@ def main(argv: list[str] | None = None) -> None:
             torch.tensor(table.get("negative"), device=devices["dmn"])
             .mean(dim=0, keepdim=True)
         )
+        love_emb = (
+            torch.tensor(table.get("affection"), device=devices["dmn"])
+            .mean(dim=0, keepdim=True)
+        )
     else:
         like_emb = torch.zeros(1, 768, device=devices["dmn"])
         dislike_emb = torch.zeros(1, 768, device=devices["dmn"])
+        love_emb = torch.zeros(1, 768, device=devices["dmn"])
 
     sup_parietal = SuperiorParietalLobule(
         device=devices["dmn"], persist_path=f"{persist_dir}/superior_parietal_lobule.pt"
@@ -697,7 +702,10 @@ def main(argv: list[str] | None = None) -> None:
             dislike_sim = torch.nn.functional.cosine_similarity(
                 context.view(-1), dislike_emb.view(-1), dim=0
             ).item()
-            axis.update_valence(like_sim - dislike_sim)
+            love_sim = torch.nn.functional.cosine_similarity(
+                context.view(-1), love_emb.view(-1), dim=0
+            ).item()
+            axis.update_valence(like_sim - dislike_sim, affection=love_sim)
 
             # Prediction step using simple similarity to like/dislike prototypes
             prev_context = context.detach()

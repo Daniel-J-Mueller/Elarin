@@ -37,6 +37,9 @@ DEFAULT_PHRASES: Dict[str, List[str]] = {
         "terrible idea",
         "stop that",
     ],
+    "affection": [
+        "I love this",
+    ],
 }
 
 
