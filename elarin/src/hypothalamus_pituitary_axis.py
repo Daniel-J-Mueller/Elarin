@@ -25,6 +25,7 @@ class HypothalamusPituitaryAxis:
         self.norepinephrine = 0.0
         self.serotonin = 0.0
         self.acetylcholine = 0.0
+        self.oxytocin = 0.0
         # Habituation state to gradually suppress repetitive intero signals
         self.habituation = 1.0
         self.hab_decay = habituation_decay
@@ -68,8 +69,9 @@ class HypothalamusPituitaryAxis:
         error_delta = (error - self.error_avg) / (self.error_var**0.5 + 1e-6)
 
         self.dopamine = 0.9 * self.dopamine + novelty_delta
-        self.norepinephrine = 0.9 * self.norepinephrine + error_delta
-        self.serotonin = 0.995 * self.serotonin - 0.05 * novelty_delta
+        self.norepinephrine = 0.85 * self.norepinephrine + error_delta
+        self.serotonin = 0.99 * self.serotonin - 0.02 * novelty_delta
+        self.oxytocin = 0.995 * self.oxytocin
         self.acetylcholine = 0.9 * self.acetylcholine + abs(
             novelty_delta - error_delta
         )
@@ -77,6 +79,7 @@ class HypothalamusPituitaryAxis:
         self.dopamine = max(0.0, min(1.0, self.dopamine))
         self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
         self.serotonin = max(0.0, min(1.0, self.serotonin))
+        self.oxytocin = max(0.0, min(1.0, self.oxytocin))
         self.acetylcholine = max(0.0, min(1.0, self.acetylcholine))
 
     def filter_intero(self, emb: torch.Tensor) -> torch.Tensor:
@@ -105,14 +108,19 @@ class HypothalamusPituitaryAxis:
         self.prev_intero = emb.detach().cpu()
         return emb * self.habituation
 
-    def update_valence(self, valence: float) -> None:
-        """Adjust dopamine and serotonin based on subjective valence."""
+    def update_valence(self, valence: float, affection: float | None = None) -> None:
+        """Adjust hormones based on subjective valence and affection."""
         pos = max(0.0, float(valence))
         neg = max(0.0, float(-valence))
+        aff = max(0.0, float(affection or 0.0))
         self.dopamine = 0.95 * self.dopamine + pos
-        self.serotonin = 0.95 * self.serotonin + neg
+        self.serotonin = 0.97 * self.serotonin + neg
+        self.norepinephrine = 0.9 * self.norepinephrine + 0.3 * neg
+        self.oxytocin = 0.98 * self.oxytocin + 0.5 * aff - 0.1 * neg
         self.dopamine = max(0.0, min(1.0, self.dopamine))
         self.serotonin = max(0.0, min(1.0, self.serotonin))
+        self.norepinephrine = max(0.0, min(1.0, self.norepinephrine))
+        self.oxytocin = max(0.0, min(1.0, self.oxytocin))
 
     def adjust_inhibition(self, baseline: float) -> None:
         """Modify hormone levels based on subthalamic nucleus baseline.
@@ -141,11 +149,12 @@ class HypothalamusPituitaryAxis:
     def log_levels(self, logger: "logging.Logger") -> None:
         """Emit current hormone levels to ``logger``."""
         logger.info(
-            "dopamine=%.3f norepinephrine=%.3f serotonin=%.3f acetylcholine=%.3f",
+            "dopamine=%.3f norepinephrine=%.3f serotonin=%.3f acetylcholine=%.3f oxytocin=%.3f",
             self.dopamine,
             self.norepinephrine,
             self.serotonin,
             self.acetylcholine,
+            self.oxytocin,
         )
 
     def memory_pressure(self, usage_gb: float) -> None:
