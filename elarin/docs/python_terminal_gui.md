@@ -54,4 +54,5 @@ Ratings and corrections are appended to `persistent/cli_feedback.log` so future 
 
 ## Future Improvements
 
-* Visualise hormone levels and novelty metrics in additional panes.
+* Visualise novelty metrics in additional panes. Hormone levels are now shown in
+  the top bar of the training interface.

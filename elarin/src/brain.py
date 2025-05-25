@@ -638,6 +638,8 @@ def main(argv: list[str] | None = None) -> None:
                 aff_v = F.cosine_similarity(text_emb, love_emb.to(text_emb.device), dim=1).item()
                 incor_v = F.cosine_similarity(text_emb, incorrect_emb.to(text_emb.device), dim=1).item()
                 axis.update_valence(pos_v - neg_v - incor_v, affection=aff_v)
+                if incor_v > 0.0:
+                    axis.penalize_incorrect(incor_v)
                 temporal.clear()
             else:
                 text_emb = torch.zeros(
@@ -930,7 +932,18 @@ def main(argv: list[str] | None = None) -> None:
                 axis.log_levels(logger)
 
             if viewer:
-                viewer.update(frame_rgb, out_text, audio_level)
+                viewer.update(
+                    frame_rgb,
+                    out_text,
+                    audio_level,
+                    {
+                        "dopamine": axis.dopamine,
+                        "norepinephrine": axis.norepinephrine,
+                        "serotonin": axis.serotonin,
+                        "acetylcholine": axis.acetylcholine,
+                        "oxytocin": axis.oxytocin,
+                    },
+                )
                 taught, treat = viewer.poll_text_input()
             else:
                 taught, treat = None, False

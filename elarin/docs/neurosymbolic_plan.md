@@ -78,6 +78,8 @@ Each connection mirrors the anatomical ordering described in the reference text.
   Kaiming-initialized parameters and tracks which modules have been born.
 - Refine the new PyGame training GUI so errors display in a dedicated pane and
   ratings are provided via clickable buttons.
+- Add a small overlay showing novelty metrics alongside hormone levels in the
+  viewer so fluctuations can be monitored live.
 - Increase basal ganglia gating when norepinephrine or serotonin is high so the
   system vocalises when distressed and learns from early feedback.
 - Delay further motor output until ratings are received or a short timeout
