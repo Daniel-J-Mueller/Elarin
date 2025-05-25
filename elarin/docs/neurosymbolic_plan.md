@@ -111,5 +111,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
 - Spoken input now updates hormone levels by comparing transcripts to the
   valence phrase table, including a new `incorrect` category that boosts
   norepinephrine when detected.
+- Clamped hormone deltas and added mild decay for norepinephrine and
+  acetylcholine so they no longer saturate at the maximum level.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
