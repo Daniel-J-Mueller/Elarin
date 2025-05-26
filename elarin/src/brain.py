@@ -59,8 +59,6 @@ from .gui_train import GUITrain
 from .viewer import Viewer
 from .utils.camera import Camera
 from .utils.audio_buffer import AudioBuffer
-from .utils.tts import KokoroTTS
-from .utils.audio_player import play_audio
 from .utils.neurogenesis import maybe_initialize
 
 
@@ -87,6 +85,7 @@ def main(argv: list[str] | None = None) -> None:
     hippocampus_shards = int(settings.get("hippocampus_shards", 1))
     cerebral_hemispheres = int(settings.get("cerebral_hemispheres", 1))
     hippocampus_independent = bool(settings.get("hippocampus_independent", False))
+    num_amygdala = int(settings.get("num_amygdala", 2))
     salience_thresh = float(
         settings.get("hippocampus_salience_threshold", 0.0)
     )
@@ -97,7 +96,6 @@ def main(argv: list[str] | None = None) -> None:
     ifg_feedback_buffer = float(settings.get("ifg_feedback_buffer", 30))
     gpu_debug = bool(settings.get("gpu_debug", False))
     timing_debug = bool(settings.get("model_timing_debug", False))
-    tts_enabled = bool(settings.get("TTS", False))
     serotonin_baseline = float(settings.get("serotonin_baseline", 0.5))
     dopamine_baseline = float(settings.get("dopamine_baseline", 0.5))
 
@@ -122,11 +120,6 @@ def main(argv: list[str] | None = None) -> None:
     cochlea = Cochlea(models["whisper"], device=devices["cochlea"])
     primary_aud = PrimaryAuditoryCortex(device=devices["auditory_cortex"])
     auditory = AuditoryCortex(device=devices["auditory_cortex"])
-    tts = None
-    if tts_enabled:
-        tts_path = models.get("kokoro_tts", "models/kokoro-82m")
-        tts_device = devices.get("kokoro_tts", devices["motor_cortex"])
-        tts = KokoroTTS(tts_path, device=tts_device)
     if gpu_debug:
         models_for_profile.extend(
             [
@@ -143,7 +136,7 @@ def main(argv: list[str] | None = None) -> None:
     if embedding_choice == 1:
         embed_path = models["gpt2"]
     elif embedding_choice == 2:
-        embed_path = models.get("nomic", models["gpt2"])
+        embed_path = models.get("bert", models["gpt2"])
     else:
         raise ValueError(f"unknown embedding_model: {embedding_choice}")
 
@@ -227,7 +220,7 @@ def main(argv: list[str] | None = None) -> None:
         "motor": 768,
         "speech": 768,
     }
-    total_shards = hippocampus_shards * cerebral_hemispheres
+    total_shards = hippocampus_shards
     if total_shards > 1:
         shard_paths = [
             f"{persist_dir}/hippocampus_memory_shard_{i}.npz"
@@ -272,18 +265,26 @@ def main(argv: list[str] | None = None) -> None:
     )
     if gpu_debug:
         models_for_profile.append((subiculum, "subiculum"))
-    amygdala = Amygdala(
-        device=devices["dmn"], persist_path=f"{persist_dir}/amygdala_emotion.pt"
-    )
-    maybe_initialize(
-        amygdala,
-        f"{persist_dir}/amygdala_emotion.pt",
-        "amygdala_emotion",
-        neurogenesis,
-        init_state_file,
-    )
-    if gpu_debug:
-        models_for_profile.append((amygdala, "amygdala"))
+    amygdalae = []
+    for idx in range(num_amygdala):
+        amg = Amygdala(
+            device=devices["dmn"],
+            persist_path=f"{persist_dir}/amygdala_{idx}.pt",
+        )
+        maybe_initialize(
+            amg,
+            f"{persist_dir}/amygdala_{idx}.pt",
+            f"amygdala_{idx}",
+            neurogenesis,
+            init_state_file,
+        )
+        if gpu_debug:
+            models_for_profile.append((amg, f"amygdala_{idx}"))
+        amygdalae.append(amg)
+
+    def eval_amygdala(embedding: torch.Tensor) -> float:
+        vals = [a.evaluate(embedding) for a in amygdalae]
+        return float(sum(vals) / len(vals)) if vals else 0.0
     frontal = FrontalLobe(
         device=devices["dmn"],
         persist_path=f"{persist_dir}/frontal_lobe.pt",
@@ -783,7 +784,7 @@ def main(argv: list[str] | None = None) -> None:
                         )
                         val = float(mem.get("valence", 0.0))
                         if val == 0.0:
-                            val = amygdala.evaluate(e.unsqueeze(0))
+                            val = eval_amygdala(e.unsqueeze(0))
                         vals.append(val)
                     return torch.tensor(vals, device=embs.device)
 
@@ -827,10 +828,6 @@ def main(argv: list[str] | None = None) -> None:
                 fb_aug = torch.zeros_like(out_aug)
             if out_text:
                 silent_steps = 0
-                if tts is not None:
-                    audio_out = tts.synthesize(out_text)
-                    play_audio(audio_out, samplerate=tts.sample_rate)
-                    audio_buf.inject(audio_out)
             else:
                 silent_steps += 1
                 if silent_steps > 10:
@@ -839,7 +836,7 @@ def main(argv: list[str] | None = None) -> None:
                     silent_steps = 5
 
             insula_emb = insula(out_aug)
-            valence = amygdala.evaluate(context)
+            valence = eval_amygdala(context)
             valence += pos_v - neg_v - incor_v
             pain_mod = cingulate.modulate(torch.tensor([[valence]]))
             axis.dopamine = max(0.0, min(1.0, axis.dopamine + midbrain.adjust(context)))
@@ -885,8 +882,8 @@ def main(argv: list[str] | None = None) -> None:
                     corpus.long_lora,
                     pfc.short_lora,
                     pfc.long_lora,
-                    amygdala.short_lora,
-                    amygdala.long_lora,
+                    *[a.short_lora for a in amygdalae],
+                    *[a.long_lora for a in amygdalae],
                     motor.damp_lora,
                     motor.long_lora,
                     insular.short_lora,
@@ -957,7 +954,7 @@ def main(argv: list[str] | None = None) -> None:
                 with log_timing("wernickes_area", "inference", timing_debug, log_dir):
                     teach_emb = wernicke.encode([taught]).mean(dim=1)
                 teach_emb = augmenter(teach_emb)
-                teach_val = amygdala.evaluate(teach_emb)
+                teach_val = eval_amygdala(teach_emb)
                 tokens = wernicke.tokenizer.encode(taught)
                 # training data now collected directly without transition table
                 ctx_store = entorhinal.funnel(teach_emb)
@@ -998,8 +995,8 @@ def main(argv: list[str] | None = None) -> None:
                         corpus.long_lora,
                         pfc.short_lora,
                         pfc.long_lora,
-                        amygdala.short_lora,
-                        amygdala.long_lora,
+                        *[a.short_lora for a in amygdalae],
+                        *[a.long_lora for a in amygdalae],
                         motor.damp_lora,
                         motor.long_lora,
                         insular.short_lora,
@@ -1053,7 +1050,8 @@ def main(argv: list[str] | None = None) -> None:
         hippocampus.save()
         motor.save()
         augmenter.save()
-        amygdala.save()
+        for a in amygdalae:
+            a.save()
         pfc.save()
         corpus.save()
         basal.save()

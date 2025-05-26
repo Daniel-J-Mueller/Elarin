@@ -14,5 +14,4 @@ msgpack
 msgpack-numpy
 psutil
 soundfile
-kokoro>=0.9.2
 librosa

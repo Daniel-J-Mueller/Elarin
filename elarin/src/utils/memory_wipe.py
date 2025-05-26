@@ -35,6 +35,12 @@ def wipe(persist_dir: str | Path | None = None) -> None:
             logger.info(f"deleted {target}")
             removed = True
 
+    # remove distributed hippocampus shards
+    for shard in path.glob("hippocampus_memory_shard_*.npz"):
+        shard.unlink()
+        logger.info(f"deleted {shard}")
+        removed = True
+
     # remove any additional files or directories except README
     for extra in list(path.iterdir()):
         if extra.name == "README.md" or extra.name == "token_embeddings.npy" or extra.name == "valence.npy":

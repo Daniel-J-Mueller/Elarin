@@ -22,4 +22,3 @@ persistent/motor_cortex_adapters.pt
 elarin/logs/debug.log
 elarin/logs/GPU_debug.log
 elarin/logs/model_timing_debug.log
-elarin/models/kokoro-82m
