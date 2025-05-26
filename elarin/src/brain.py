@@ -665,9 +665,14 @@ def main(argv: list[str] | None = None) -> None:
                     axis.penalize_incorrect(incor_v)
                 temporal.clear()
             else:
+                emb_dim = getattr(
+                    wernicke.model.config,
+                    "n_embd",
+                    getattr(wernicke.model.config, "hidden_size", 768),
+                )
                 text_emb = torch.zeros(
                     1,
-                    wernicke.model.config.n_embd,
+                    emb_dim,
                     device=wernicke.device,
                 )
                 pos_v = neg_v = aff_v = incor_v = 0.0
