@@ -21,6 +21,7 @@ class SupplementaryMotorArea(nn.Module):
         hidden_dim: int = 64,
         device: str = "cpu",
         ramp_duration: float = 300.0,
+        use_ramping: bool = False,
         persist_path: str | None = None,
     ) -> None:
         super().__init__()
@@ -36,6 +37,7 @@ class SupplementaryMotorArea(nn.Module):
         self.to(device)
         self.start_time = time.time()
         self.ramp_duration = float(ramp_duration)
+        self.use_ramping = use_ramping
         self.min_thresh = 0.25
         self.max_thresh = 0.75
         self.persist_path = Path(persist_path) if persist_path else None
@@ -56,7 +58,10 @@ class SupplementaryMotorArea(nn.Module):
         )
         out = self.net(inputs) + self.short_lora(inputs) + self.long_lora(inputs)
         mix = float(out.squeeze())
-        ramp = min(1.0, (time.time() - self.start_time) / self.ramp_duration)
+        if self.use_ramping:
+            ramp = min(1.0, (time.time() - self.start_time) / self.ramp_duration)
+        else:
+            ramp = 1.0
         base = self.min_thresh + (self.max_thresh - self.min_thresh) * ramp
         base -= 0.1 * (dopamine - 0.5)
         thresh = (base + mix) / 2.0

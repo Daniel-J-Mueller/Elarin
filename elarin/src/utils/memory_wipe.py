@@ -73,6 +73,29 @@ def wipe(persist_dir: str | Path | None = None) -> None:
     else:
         logger.info("no memory snapshots found")
 
+    log_path = Path(cfg.get("log_dir", "logs"))
+    if not log_path.is_absolute():
+        log_path = BASE_DIR / log_path
+    if log_path.exists():
+        log_removed = False
+        for item in log_path.iterdir():
+            if item.name == ".gitkeep":
+                continue
+            if item.is_file():
+                item.unlink()
+                logger.info(f"removed log file {item}")
+                log_removed = True
+            elif item.is_dir():
+                shutil.rmtree(item)
+                logger.info(f"removed log directory {item}")
+                log_removed = True
+        if log_removed:
+            logger.info("logs cleared")
+        else:
+            logger.info("no log files found")
+    else:
+        logger.info(f"{log_path} does not exist; nothing to wipe")
+
 
 if __name__ == "__main__":
     wipe()
