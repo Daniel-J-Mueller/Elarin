@@ -23,6 +23,7 @@ from .language_areas.wernicke_adapter import WernickeAdapter
 from .insular_cortex import InsularCortex
 from .basal_ganglia import BasalGanglia
 from .subthalamic_nucleus import SubthalamicNucleus
+from .supplementary_motor_area import SupplementaryMotorArea
 from .cerebellum import Cerebellum
 from .corpus_callosum import CorpusCallosum
 from .amygdala import Amygdala
