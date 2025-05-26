@@ -92,7 +92,6 @@ def main(argv: list[str] | None = None) -> None:
         settings.get("hippocampus_salience_threshold", 0.0)
     )
     motor_candidates = int(settings.get("motor_candidates", 1))
-    motor_pause = float(settings.get("motor_pause_seconds", 4.0))
     log_to_file = bool(settings.get("log_to_file", False))
     neurogenesis = bool(settings.get("neurogenesis", False))
     training_buffer = float(settings.get("training_buffer", 30))
@@ -408,15 +407,30 @@ def main(argv: list[str] | None = None) -> None:
     if gpu_debug:
         models_for_profile.append((medulla, "medulla_oblongata"))
     stn = SubthalamicNucleus(device=devices["dmn"])
+    sma = SupplementaryMotorArea(
+        device=devices["dmn"],
+        persist_path=f"{persist_dir}/supplementary_motor_area.pt",
+    )
+    maybe_initialize(
+        sma,
+        f"{persist_dir}/supplementary_motor_area.pt",
+        "supplementary_motor_area",
+        neurogenesis,
+        init_state_file,
+    )
+    if gpu_debug:
+        models_for_profile.append((sma, "supplementary_motor_area"))
     basal = BasalGanglia(
         input_dim=768,
         device=devices["dmn"],
         axis=axis,
         prefrontal=pfc,
+        premotor=frontal.premotor,
+        ifg=frontal.inferior_frontal,
+        supplementary=sma,
         stn=stn,
         persist_path=f"{persist_dir}/basal_ganglia_gating.pt",
         submodule_dir=str(persist_dir),
-        pause_seconds=motor_pause,
     )
     maybe_initialize(
         basal,

@@ -12,6 +12,9 @@ from .putamen import Putamen
 from .globus_pallidus import GlobusPallidus
 from .nucleus_accumbens import NucleusAccumbens
 from .substantia_nigra import SubstantiaNigra
+from .premotor_cortex import PremotorCortex
+from .inferior_frontal_gyrus import InferiorFrontalGyrus
+from .supplementary_motor_area import SupplementaryMotorArea
 
 
 class BasalGanglia(nn.Module):
@@ -24,11 +27,13 @@ class BasalGanglia(nn.Module):
         device: str = "cpu",
         axis: "HypothalamusPituitaryAxis | None" = None,
         prefrontal: "PrefrontalCortex | None" = None,
+        premotor: "PremotorCortex | None" = None,
+        ifg: "InferiorFrontalGyrus | None" = None,
+        supplementary: "SupplementaryMotorArea | None" = None,
         stn: "SubthalamicNucleus | None" = None,
         persist_path: str | None = None,
         *,
         submodule_dir: str | None = None,
-        pause_seconds: float = 4.0,
     ) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -40,6 +45,9 @@ class BasalGanglia(nn.Module):
         self.device = device
         self.axis = axis
         self.prefrontal = prefrontal
+        self.premotor = premotor
+        self.ifg = ifg
+        self.supplementary = supplementary
         self.stn = stn
         self.to(device)
         self.persist_path = Path(persist_path) if persist_path else None
@@ -56,7 +64,6 @@ class BasalGanglia(nn.Module):
         self.feedback_pending = False
         self.last_rating = 0.0
         self.feedback_timeout = 2.0
-        self.pause_seconds = float(pause_seconds)
         if self.persist_path and self.persist_path.exists():
             state = torch.load(self.persist_path, map_location=device)
             self.load_state_dict(state)
@@ -80,9 +87,6 @@ class BasalGanglia(nn.Module):
         if self.feedback_pending and time.time() - self.last_output_time < self.feedback_timeout:
             return False
 
-        if time.time() - self.last_output_time < self.pause_seconds:
-            return False
-
         prob = float(self.net(embedding.to(self.device)))
         prob *= self.caudate.evaluate(embedding)
         prob *= self.putamen.facilitate(embedding)
@@ -100,11 +104,25 @@ class BasalGanglia(nn.Module):
         if self.prefrontal is not None:
             pf = float(self.prefrontal(embedding.to(self.prefrontal.device)))
             prob *= pf
+        else:
+            pf = 0.5
+        if self.premotor is not None:
+            plan = self.premotor.prepare(embedding.to(self.premotor.device))
+        else:
+            plan = embedding
+        if self.ifg is not None:
+            inhibit_val = float(self.ifg.inhibit(embedding.to(self.ifg.device)))
+        else:
+            inhibit_val = 0.0
         if self.stn is not None:
             prob *= 1.0 - float(self.stn.inhibition(embedding))
         prob += 0.1 * self.last_rating
         prob = max(0.0, min(1.0, prob))
-        return prob > 0.25
+        threshold = 0.25
+        if self.supplementary is not None:
+            dopamine = float(self.axis.dopamine) if self.axis is not None else 0.5
+            threshold = self.supplementary.compute_threshold(plan, pf, inhibit_val, dopamine)
+        return prob > threshold
 
     @torch.no_grad()
     def approve_action(self, action: torch.Tensor) -> bool:
