@@ -57,7 +57,7 @@ class WernickesArea:
         # empty string is provided.  This leads to a runtime error inside the
         # model when it tries to reshape a ``(batch, 0)`` tensor.  Replace empty
         # strings with the EOS token so they encode to a valid single token.
-        fixed = [t if t else self.tokenizer.eos_token for t in texts]
+        fixed = [str(t) if t else self.tokenizer.eos_token for t in texts]
         # ``max_length`` previously forced sequences to pad to 1024 tokens which
         # meant short inputs ended up dominated by ``pad_token`` embeddings.
         # That drowned out the actual content when selecting the last token.
