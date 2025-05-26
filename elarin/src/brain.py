@@ -102,6 +102,9 @@ def main(argv: list[str] | None = None) -> None:
     serotonin_baseline = float(settings.get("serotonin_baseline", 0.5))
     dopamine_baseline = float(settings.get("dopamine_baseline", 0.5))
     recalc_tables = bool(settings.get("recalculate_lookup_tables", False))
+    enable_action_threshold_ramping = bool(
+        settings.get("enable_action_threshold_ramping", False)
+    )
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -410,6 +413,7 @@ def main(argv: list[str] | None = None) -> None:
     stn = SubthalamicNucleus(device=devices["dmn"])
     sma = SupplementaryMotorArea(
         device=devices["dmn"],
+        use_ramping=enable_action_threshold_ramping,
         persist_path=f"{persist_dir}/supplementary_motor_area.pt",
     )
     maybe_initialize(

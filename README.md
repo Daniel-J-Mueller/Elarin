@@ -184,7 +184,7 @@ launch. Each LoRA adapter is saved to its own ``<region>_<adapter>.pt`` file
 alongside the main checkpoint so updates are never lost. Removing that
 directory resets the brain back to its initial state. You can also run
 ``python -m elarin.src.utils.memory_wipe`` to delete any saved snapshots
-in the ``elarin/persistent/`` folder. If the ``recalculate_lookup_tables``
-setting is enabled this command will also remove the ``token_embeddings.npy``
-and ``valence.npy`` lookup tables so they are rebuilt on the next run.
-Run ``python -m elarin.src.utils.log_wipe`` to clear accumulated log files.
+in the ``elarin/persistent/`` folder and clear accumulated log files.
+If the ``recalculate_lookup_tables`` setting is enabled this command will
+also remove the ``token_embeddings.npy`` and ``valence.npy`` lookup tables
+so they are rebuilt on the next run.

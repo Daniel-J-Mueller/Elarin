@@ -56,3 +56,5 @@ settings:
   dopamine_baseline: 0.5
   # Recalculate token and valence lookup tables on startup
   recalculate_lookup_tables: true
+  # Gradually increase action gating threshold after launch
+  enable_action_threshold_ramping: false
