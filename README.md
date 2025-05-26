@@ -49,8 +49,10 @@ The script downloads the following models sequentially:
 
 3. **Precompute Token Embeddings**
 
-   Generate a lookup table of GPT-2 token embeddings used by the language
-   areas. The output is written to ``elarin/persistent/token_embeddings.npy``.
+   Generate a lookup table of token embeddings used by the language areas. The
+   output is written to ``elarin/persistent/token_embeddings.npy``.  If the
+   ``recalculate_lookup_tables`` option in ``configs/default.yaml`` is set to
+   ``true`` the table will be rebuilt automatically when the brain starts.
 
    ```bash
    python elarin/src/utils/token_table.py
@@ -60,7 +62,9 @@ The script downloads the following models sequentially:
 
    Create a small table of positive, negative, affection and incorrect phrases
    used when assessing emotional valence. The resulting file is
-   ``elarin/persistent/valence.npy``.
+   ``elarin/persistent/valence.npy``.  Like the token table, this can also be
+   regenerated automatically at start-up when
+   ``recalculate_lookup_tables`` is enabled.
 
    ```bash
    python elarin/src/utils/valence_table.py

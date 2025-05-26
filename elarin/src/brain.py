@@ -60,6 +60,8 @@ from .viewer import Viewer
 from .utils.camera import Camera
 from .utils.audio_buffer import AudioBuffer
 from .utils.neurogenesis import maybe_initialize
+from .utils.token_table import generate as generate_token_table
+from .utils.valence_table import generate as generate_valence_table
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -98,6 +100,7 @@ def main(argv: list[str] | None = None) -> None:
     timing_debug = bool(settings.get("model_timing_debug", False))
     serotonin_baseline = float(settings.get("serotonin_baseline", 0.5))
     dopamine_baseline = float(settings.get("dopamine_baseline", 0.5))
+    recalc_tables = bool(settings.get("recalculate_lookup_tables", False))
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -140,6 +143,22 @@ def main(argv: list[str] | None = None) -> None:
     else:
         raise ValueError(f"unknown embedding_model: {embedding_choice}")
 
+    token_table_path = persist_dir / "token_embeddings.npy"
+    if recalc_tables or not token_table_path.exists():
+        generate_token_table(
+            embed_path,
+            token_table_path,
+            device=devices["language_areas"],
+        )
+
+    valence_path = persist_dir / "valence.npy"
+    if recalc_tables or not valence_path.exists():
+        generate_valence_table(
+            embed_path,
+            valence_path,
+            device=devices["dmn"],
+        )
+
     wernicke = WernickesArea(
         embed_path,
         device=devices["language_areas"],
@@ -148,7 +167,6 @@ def main(argv: list[str] | None = None) -> None:
     if gpu_debug:
         models_for_profile.append((wernicke.model, "wernicke"))
 
-    valence_path = persist_dir / "valence.npy"
     if valence_path.exists():
         table = np.load(valence_path, allow_pickle=True).item()
         like_emb = (
