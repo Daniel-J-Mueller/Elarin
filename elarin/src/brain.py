@@ -105,6 +105,9 @@ def main(argv: list[str] | None = None) -> None:
     enable_action_threshold_ramping = bool(
         settings.get("enable_action_threshold_ramping", False)
     )
+    action_threshold_ramp_duration = float(
+        settings.get("action_threshold_ramp_duration", 300.0)
+    )
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -413,6 +416,7 @@ def main(argv: list[str] | None = None) -> None:
     stn = SubthalamicNucleus(device=devices["dmn"])
     sma = SupplementaryMotorArea(
         device=devices["dmn"],
+        ramp_duration=action_threshold_ramp_duration,
         use_ramping=enable_action_threshold_ramping,
         persist_path=f"{persist_dir}/supplementary_motor_area.pt",
     )

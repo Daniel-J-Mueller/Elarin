@@ -135,8 +135,10 @@ cortex generates each step. Increasing this value trains on multiple
 possible outputs while only printing the highest-probability token.
 Motor output timing is now governed by a ``SupplementaryMotorArea`` that mixes
 signals from the premotor cortex, inferior frontal gyrus and prefrontal cortex.
-Its adaptive threshold ramps up over the first five minutes instead of using the
+Its adaptive threshold ramps up over a configurable duration instead of using the
 previous fixed ``motor_pause_seconds`` delay.
+The ramp length is controlled by ``action_threshold_ramp_duration`` which
+defaults to ``60`` seconds and can be adjusted in ``configs/default.yaml``.
 The ``embedding_model`` option at the top of the file chooses which
 text encoder to use (``1`` for GPT-2, ``2`` for the BERT model).
 ``hippocampus_shards`` sets the total number of memory shards to use while
