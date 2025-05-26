@@ -40,8 +40,16 @@ def generate(
         if torch.cuda.device_count() < len(device_ids):
             device_ids = list(range(torch.cuda.device_count()))
         if len(device_ids) > 1:
+            # Move the model to the primary CUDA device before wrapping in
+            # ``DataParallel`` so the parameters are replicated correctly.
+            primary_device = f"cuda:{device_ids[0]}"
+            model.to(primary_device)
             model = torch.nn.DataParallel(model, device_ids=device_ids)
-    model.to(device)
+            device = primary_device
+        else:
+            model.to(device)
+    else:
+        model.to(device)
     model.eval()
 
     # ``DataParallel`` wraps the model and hides the ``config`` attribute on the
