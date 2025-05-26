@@ -37,7 +37,12 @@ class TemporalLobe:
     def embedding(self, wernicke: WernickesArea) -> torch.Tensor:
         """Return combined embedding of remaining speculative tokens."""
         if not self._buffer:
-            return torch.zeros(1, wernicke.model.config.n_embd, device=wernicke.device)
+            emb_dim = getattr(
+                wernicke.model.config,
+                "n_embd",
+                getattr(wernicke.model.config, "hidden_size", 768),
+            )
+            return torch.zeros(1, emb_dim, device=wernicke.device)
         text = "".join(self._buffer)
         return wernicke.encode([text]).mean(dim=1)
 
