@@ -21,6 +21,7 @@ class SupplementaryMotorArea(nn.Module):
         hidden_dim: int = 64,
         device: str = "cpu",
         ramp_duration: float = 300.0,
+        target_threshold: float = 0.75,
         use_ramping: bool = False,
         persist_path: str | None = None,
     ) -> None:
@@ -37,9 +38,9 @@ class SupplementaryMotorArea(nn.Module):
         self.to(device)
         self.start_time = time.time()
         self.ramp_duration = float(ramp_duration)
+        self.target_threshold = float(target_threshold)
         self.use_ramping = use_ramping
         self.min_thresh = 0.25
-        self.max_thresh = 0.75
         self.persist_path = Path(persist_path) if persist_path else None
         if self.persist_path and self.persist_path.exists():
             self.load_state_dict(torch.load(self.persist_path, map_location=device))
@@ -60,9 +61,9 @@ class SupplementaryMotorArea(nn.Module):
         mix = float(out.squeeze())
         if self.use_ramping:
             ramp = min(1.0, (time.time() - self.start_time) / self.ramp_duration)
+            base = self.min_thresh + (self.target_threshold - self.min_thresh) * ramp
         else:
-            ramp = 1.0
-        base = self.min_thresh + (self.max_thresh - self.min_thresh) * ramp
+            base = self.target_threshold
         base -= 0.1 * (dopamine - 0.5)
         thresh = (base + mix) / 2.0
         return max(0.0, min(1.0, thresh))

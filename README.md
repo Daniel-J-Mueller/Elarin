@@ -139,6 +139,8 @@ Its adaptive threshold ramps up over a configurable duration instead of using th
 previous fixed ``motor_pause_seconds`` delay.
 The ramp length is controlled by ``action_threshold_ramp_duration`` which
 defaults to ``60`` seconds and can be adjusted in ``configs/default.yaml``.
+When ``enable_action_threshold_ramping`` is ``false`` the gating threshold is
+fixed to ``action_threshold_baseline`` (default ``0.75``).
 The ``embedding_model`` option at the top of the file chooses which
 text encoder to use (``1`` for GPT-2, ``2`` for the BERT model).
 ``hippocampus_shards`` sets the total number of memory shards to use while

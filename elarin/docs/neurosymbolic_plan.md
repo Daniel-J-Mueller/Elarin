@@ -116,6 +116,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   blending premotor, IFG and prefrontal signals. Its threshold ramps up over a
   configurable duration (``action_threshold_ramp_duration``, default ``60``
   seconds) so Elarin babbles initially but becomes quieter when dopamine
-  feedback stays low.
+  feedback stays low. When ramping is disabled, the threshold is fixed to
+  ``action_threshold_baseline`` (default ``0.75``).
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
