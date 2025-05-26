@@ -11,7 +11,6 @@ devices:
   cortex_modules: cuda:2
   motor_cortex: cuda:3
   language_areas: cuda:3
-  kokoro_tts: cuda:3
   trainer: cuda:0
 
 # Paths to offline models relative to repository root
@@ -19,12 +18,11 @@ models:
   clip: models/clip-vit-b32
   whisper: models/whisper-small
   gpt2: models/gpt2
-  nomic: models/nomic-embed-text-v2-moe
-  kokoro_tts: models/kokoro-82m
 
+  bert: models/bert-base-uncased
 # Embedding model options:
 # 1 - gpt2
-# 2 - nomic-ai/nomic-embed-text-v2-moe
+# 2 - bert-base-uncased
 embedding_model: 1
 
 # Directory for saving learned state
@@ -42,9 +40,10 @@ settings:
   # Capacity of episodic memory buffer
   hippocampus_capacity: 1000000
   hippocampus_recall_threshold: 0.2
-  hippocampus_shards: 2
+  hippocampus_shards: 4
   cerebral_hemispheres: 2
   hippocampus_independent: true
+  num_amygdala: 2
   hippocampus_salience_threshold: 0.0
   # Number of speculative motor tokens to generate per step (debug mode)
   motor_candidates: 1
@@ -53,7 +52,6 @@ settings:
   ifg_feedback_buffer: 30  # seconds that inhibition feedback remains active
   gpu_debug: true
   model_timing_debug: true
-  TTS: false
 
   serotonin_baseline: 0.5
   dopamine_baseline: 0.5

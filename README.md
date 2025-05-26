@@ -45,8 +45,7 @@ The script downloads the following models sequentially:
    - `openai/clip-vit-base-patch32`
    - `openai/whisper-small`
    - `gpt2`
-   - `nomic-ai/nomic-embed-text-v2-moe`
-   - `hexgrad/Kokoro-82M`
+   - `bert-base-uncased`
 
 3. **Precompute Token Embeddings**
 
@@ -94,7 +93,7 @@ so that only continuous embeddings are passed between brain regions. The
 `WernickesArea` class in `src/language_areas/wernickes_area.py` wraps the
 front half of GPT-2 by default and exposes hidden-state embeddings without the
 language modeling head.  Alternatively, you can enable the
-`nomic-ai/nomic-embed-text-v2-moe` model in `configs/default.yaml` to
+`bert-base-uncased` model in `configs/default.yaml` to
 experiment with a different encoder. Text is tokenized only transiently
 during encoding and is immediately discarded.
 
@@ -131,12 +130,11 @@ The ``settings`` section of ``configs/default.yaml`` now includes
 cortex generates each step. Increasing this value trains on multiple
 possible outputs while only printing the highest-probability token.
 The ``embedding_model`` option at the top of the file chooses which
-text encoder to use (``1`` for GPT-2, ``2`` for the Nomic model).
-``hippocampus_shards`` sets the number of memory shards to use and
+text encoder to use (``1`` for GPT-2, ``2`` for the BERT model).
+``hippocampus_shards`` sets the total number of memory shards to use while
 ``cerebral_hemispheres`` chooses how many hippocampal hemispheres are active
 (each additional hemisphere behaves like a right hemisphere so language regions
-are not duplicated). ``hippocampus_shards`` sets the number of memory shards
-per hemisphere and ``hippocampus_independent`` determines whether each shard
+are not duplicated). ``hippocampus_independent`` determines whether each shard
 stores unique episodes or mirrors the same data.
 ``neurogenesis`` can also be enabled to automatically seed blank region
 weights using Kaiming initialization whenever no trained parameters are
@@ -166,14 +164,6 @@ return toward ``0.5`` when no reinforcement is present.
 Norepinephrine and acetylcholine now also decay slowly toward zero each
 step to avoid runaway activation.
 
-Setting ``TTS`` to ``true`` enables speech synthesis of motor outputs via the
-``kokoro`` library and the ``hexgrad/Kokoro-82M`` model. Ensure
-``espeak-ng`` is installed for audio playback. The resulting audio is played
-aloud and also fed back into the cochlea so Elarin can hear her own voice.
-The GPU used for speech synthesis can be selected with the
-``devices.kokoro_tts`` option in ``configs/default.yaml`` which defaults to
-``cuda:3``.
-
 The motor cortex now predicts the likely valence of each speculative
 token using hippocampal recall and the amygdala before choosing which
 one to emit. When a predicted outcome appears favourable the
@@ -187,3 +177,4 @@ alongside the main checkpoint so updates are never lost. Removing that
 directory resets the brain back to its initial state. You can also run
 ``python -m elarin.src.utils.memory_wipe`` to delete any saved snapshots
 in the ``elarin/persistent/`` folder.
+Run ``python -m elarin.src.utils.log_wipe`` to clear accumulated log files.

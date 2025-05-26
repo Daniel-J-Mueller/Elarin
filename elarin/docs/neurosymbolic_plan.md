@@ -104,10 +104,6 @@ Each connection mirrors the anatomical ordering described in the reference text.
   messages arrive.
 - Redistributed GPU assignments in `configs/default.yaml` so sensors run on
   `cuda:1` and `cuda:2`, while the trainer now uses `cuda:0`.
-- Integrated the `kokoro` TTS library for the `hexgrad/Kokoro-82M` model to
-  improve speech quality and allow future voice customisation.
-- Added a dedicated `devices.kokoro_tts` entry so speech synthesis can run on
-  its own GPU (default `cuda:3`).
 - Introduced a configurable `cerebral_hemispheres` option so multiple
   hippocampal hemispheres can be enabled. Additional hemispheres operate like
   the right hemisphere, meaning Broca's area is not duplicated【F:human_brain_components_reference.txt†L21-L27】【F:human_brain_components_reference.txt†L65-L66】.
