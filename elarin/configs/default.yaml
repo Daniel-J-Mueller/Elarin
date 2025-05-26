@@ -54,3 +54,5 @@ settings:
 
   serotonin_baseline: 0.5
   dopamine_baseline: 0.5
+  # Recalculate token and valence lookup tables on startup
+  recalculate_lookup_tables: false

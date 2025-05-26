@@ -9,7 +9,7 @@ from typing import Iterable
 
 import numpy as np
 import torch
-from transformers import GPT2Tokenizer, GPT2Model
+from transformers import AutoTokenizer, AutoModel
 from tqdm import tqdm
 
 # Resolve the base directory of the ``elarin`` package so relative paths work
@@ -32,8 +32,8 @@ def generate(
     if not output_path.is_absolute():
         output_path = BASE_DIR / output_path
 
-    tokenizer = GPT2Tokenizer.from_pretrained(model_path)
-    model = GPT2Model.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    model = AutoModel.from_pretrained(model_path, trust_remote_code=True)
 
     if device.startswith("cuda"):
         device_ids = [0, 1, 2, 3]
@@ -47,8 +47,12 @@ def generate(
     # ``DataParallel`` wraps the model and hides the ``config`` attribute on the
     # outer object. The underlying module retains the original ``config`` so we
     # access it there when present.
-    emb_dim = model.module.config.n_embd if hasattr(model, "module") else model.config.n_embd
-    embeddings = np.zeros((len(tokenizer), emb_dim), dtype=np.float32)
+    cfg = model.module.config if hasattr(model, "module") else model.config
+    emb_dim = getattr(cfg, "n_embd", getattr(cfg, "hidden_size", 768))
+    embeddings = np.zeros((len(tokenizer), 768), dtype=np.float32)
+    proj = None
+    if emb_dim != 768:
+        proj = torch.nn.Linear(emb_dim, 768, bias=False, device=device)
     tokens = [tokenizer.decode([i], skip_special_tokens=False) for i in range(len(tokenizer))]
 
     with torch.no_grad():
@@ -56,8 +60,10 @@ def generate(
             end = min(start + batch_size, len(tokenizer))
             ids = torch.arange(start, end, device=device).unsqueeze(1)
             out = model(input_ids=ids)
-            emb = out.last_hidden_state[:, 0, :].cpu().numpy().astype(np.float32)
-            embeddings[start:end] = emb
+            emb = out.last_hidden_state[:, 0, :]
+            if proj is not None:
+                emb = proj(emb)
+            embeddings[start:end] = emb.cpu().numpy().astype(np.float32)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.save(output_path, {"tokens": tokens, "embeddings": embeddings}, allow_pickle=True)
