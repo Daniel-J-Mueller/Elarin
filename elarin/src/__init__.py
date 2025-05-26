@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = ["main"]
 
 from .subthalamic_nucleus import SubthalamicNucleus
+from .supplementary_motor_area import SupplementaryMotorArea
 
 
 def main() -> None:

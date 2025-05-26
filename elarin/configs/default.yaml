@@ -46,8 +46,6 @@ settings:
   hippocampus_salience_threshold: 0.0
   # Number of speculative motor tokens to generate per step (debug mode)
   motor_candidates: 1
-  # Minimum seconds to wait between motor outputs
-  motor_pause_seconds: 4
   neurogenesis: true
   training_buffer: 5  # seconds to retain context for GUI feedback
   ifg_feedback_buffer: 30  # seconds that inhibition feedback remains active
