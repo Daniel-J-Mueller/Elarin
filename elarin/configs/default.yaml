@@ -58,3 +58,5 @@ settings:
   recalculate_lookup_tables: true
   # Gradually increase action gating threshold after launch
   enable_action_threshold_ramping: false
+  # Seconds over which the action threshold ramps from minimum to maximum
+  action_threshold_ramp_duration: 60.0

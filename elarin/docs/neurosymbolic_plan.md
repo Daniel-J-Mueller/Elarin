@@ -113,8 +113,9 @@ Each connection mirrors the anatomical ordering described in the reference text.
 - Clamped hormone deltas and added mild decay for norepinephrine and
   acetylcholine so they no longer saturate at the maximum level.
 - Replaced the ``motor_pause_seconds`` delay with a ``SupplementaryMotorArea``
-  blending premotor, IFG and prefrontal signals. Its threshold ramps up during
-  the first five minutes so Elarin babbles initially but becomes quieter when
-  dopamine feedback stays low.
+  blending premotor, IFG and prefrontal signals. Its threshold ramps up over a
+  configurable duration (``action_threshold_ramp_duration``, default ``60``
+  seconds) so Elarin babbles initially but becomes quieter when dopamine
+  feedback stays low.
 
 This approach scales the architecture toward a more biologically faithful organisation while retaining the lightweight modular design. Each region can be trained or swapped independently, allowing experimentation with different model types without disrupting the overall system.
