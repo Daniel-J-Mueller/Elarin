@@ -108,6 +108,9 @@ def main(argv: list[str] | None = None) -> None:
     action_threshold_ramp_duration = float(
         settings.get("action_threshold_ramp_duration", 300.0)
     )
+    action_threshold_baseline = float(
+        settings.get("action_threshold_baseline", 0.75)
+    )
 
     if not persist_dir.is_absolute():
         persist_dir = BASE_DIR / persist_dir
@@ -417,6 +420,7 @@ def main(argv: list[str] | None = None) -> None:
     sma = SupplementaryMotorArea(
         device=devices["dmn"],
         ramp_duration=action_threshold_ramp_duration,
+        target_threshold=action_threshold_baseline,
         use_ramping=enable_action_threshold_ramping,
         persist_path=f"{persist_dir}/supplementary_motor_area.pt",
     )

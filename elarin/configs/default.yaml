@@ -60,3 +60,5 @@ settings:
   enable_action_threshold_ramping: false
   # Seconds over which the action threshold ramps from minimum to maximum
   action_threshold_ramp_duration: 60.0
+  # Threshold used when action threshold ramping is disabled
+  action_threshold_baseline: 0.75
