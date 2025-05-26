@@ -28,6 +28,7 @@ class BasalGanglia(nn.Module):
         persist_path: str | None = None,
         *,
         submodule_dir: str | None = None,
+        pause_seconds: float = 4.0,
     ) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -55,6 +56,7 @@ class BasalGanglia(nn.Module):
         self.feedback_pending = False
         self.last_rating = 0.0
         self.feedback_timeout = 2.0
+        self.pause_seconds = float(pause_seconds)
         if self.persist_path and self.persist_path.exists():
             state = torch.load(self.persist_path, map_location=device)
             self.load_state_dict(state)
@@ -76,6 +78,9 @@ class BasalGanglia(nn.Module):
     def gate(self, embedding: torch.Tensor) -> bool:
         """Decide whether to produce a motor action for ``embedding``."""
         if self.feedback_pending and time.time() - self.last_output_time < self.feedback_timeout:
+            return False
+
+        if time.time() - self.last_output_time < self.pause_seconds:
             return False
 
         prob = float(self.net(embedding.to(self.device)))

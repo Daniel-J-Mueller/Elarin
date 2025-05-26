@@ -133,6 +133,8 @@ The ``settings`` section of ``configs/default.yaml`` now includes
 ``motor_candidates`` which controls how many speculative tokens the motor
 cortex generates each step. Increasing this value trains on multiple
 possible outputs while only printing the highest-probability token.
+``motor_pause_seconds`` specifies the minimum delay between successive motor
+actions so Elarin pauses to think before speaking.
 The ``embedding_model`` option at the top of the file chooses which
 text encoder to use (``1`` for GPT-2, ``2`` for the BERT model).
 ``hippocampus_shards`` sets the total number of memory shards to use while
