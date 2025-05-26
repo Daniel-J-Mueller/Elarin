@@ -5,13 +5,25 @@ import shutil
 
 try:  # Support running as a script
     from .logger import get_logger
+    from .config import load_config, BASE_DIR
 except ImportError:  # pragma: no cover - fallback when executed directly
     from logger import get_logger
+    from config import load_config, BASE_DIR
 
 
 def wipe(persist_dir: str | Path | None = None) -> None:
     """Delete saved memory snapshots in the persistent directory."""
-    path = Path(persist_dir) if persist_dir else Path(__file__).resolve().parents[2] / "persistent"
+    cfg = load_config("configs/default.yaml")
+    settings = cfg.get("settings", {})
+    recalc_tables = bool(settings.get("recalculate_lookup_tables", False))
+
+    if persist_dir:
+        path = Path(persist_dir)
+    else:
+        path = Path(cfg.get("persistent_dir", "persistent"))
+        if not path.is_absolute():
+            path = BASE_DIR / path
+
     logger = get_logger("memory_wipe")
 
     if not path.exists():
@@ -43,7 +55,9 @@ def wipe(persist_dir: str | Path | None = None) -> None:
 
     # remove any additional files or directories except README
     for extra in list(path.iterdir()):
-        if extra.name == "README.md" or extra.name == "token_embeddings.npy" or extra.name == "valence.npy":
+        if extra.name == "README.md":
+            continue
+        if not recalc_tables and extra.name in ("token_embeddings.npy", "valence.npy"):
             continue
         if extra.is_file():
             extra.unlink()
