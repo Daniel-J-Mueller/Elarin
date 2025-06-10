@@ -11,7 +11,7 @@ class HypothalamusPituitaryAxis:
     maintained so hormone adjustments respond to trends rather than just the
     current value.  This helps stabilise the system when novelty or error
     fluctuates for long periods and mirrors how the limbic system modulates
-    behaviour based on context【F:human_brain_components_reference.txt†L108-L113】.
+    behaviour based on context【F:elarin/docs/human_brain_components_reference.txt†L108-L113】.
     """
 
     def __init__(
@@ -157,7 +157,7 @@ class HypothalamusPituitaryAxis:
         The baseline itself is filtered with the same ``trend_rate`` to produce
         a running mean.  Hormone levels react to deviations from that mean which
         approximates how inhibitory control adapts over time
-        【F:human_brain_components_reference.txt†L246-L250】.
+        【F:elarin/docs/human_brain_components_reference.txt†L246-L250】.
         """
 
         self.baseline_avg = (

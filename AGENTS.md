@@ -2,8 +2,8 @@
 
 # Basic Instructions
 
-1. Please refer frequently to human_brain_components_reference.txt. It serves as the 
-reference standard of which we are trying to build around. 
+1. Please refer frequently to `elarin/docs/human_brain_components_reference.txt`. It serves as the
+reference standard of which we are trying to build around.
 
 2. Any model generated or trained should be preserved and saved to the 'persistent' dir
 
