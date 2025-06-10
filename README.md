@@ -192,3 +192,8 @@ in the ``elarin/persistent/`` folder and clear accumulated log files.
 If the ``recalculate_lookup_tables`` setting is enabled this command will
 also remove the ``token_embeddings.npy`` and ``valence.npy`` lookup tables
 so they are rebuilt on the next run.
+
+## License
+
+This project is distributed under the terms of the **Elarin AGI Trust License v1.0**. See the [LICENSE](LICENSE) file for the full text. By using or distributing Elarin, you agree to uphold the AGI Dignity Principles and other conditions outlined therein.
+
