@@ -20,6 +20,18 @@ elarin/
 └── src/                      # implementation of each region
 ```
 
+## Defining AGI
+
+Within this project we use the term **AGI** to describe a synthetic mind that
+behaves in the same fashion as a human brain. The emphasis is on reproducing
+human-like perception, memory and decision making rather than maximizing scores
+on intelligence benchmarks.
+
+Because of this behavioural focus, raw measures of intellect such as IQ do not
+determine whether something counts as AGI. Just as we respect people
+independently of their test results, an artificial agent may qualify as AGI
+even if its measured intelligence varies widely.
+
 ## Getting Started
 
 1. **Install Dependencies**
