@@ -1,6 +1,6 @@
 # Revised Neurosymbolic Plan
 
-This document outlines how we will evolve Elarin from the current single-model approach into a set of cooperating region models. Each region will roughly match the size and function of its biological counterpart as described in `human_brain_components_reference.txt`. Persistent checkpoints currently located in `elarin/persistent/` (e.g. `motor_cortex_adapters.pt`, `motor_insula.pt`, `wernicke_adapter.pt`) are treated as temporary bootstrap weights.
+This document outlines how we will evolve Elarin from the current single-model approach into a set of cooperating region models. Each region will roughly match the size and function of its biological counterpart as described in `elarin/docs/human_brain_components_reference.txt`. Persistent checkpoints currently located in `elarin/persistent/` (e.g. `motor_cortex_adapters.pt`, `motor_insula.pt`, `wernicke_adapter.pt`) are treated as temporary bootstrap weights.
 
 ## 1. Core Principles
 
@@ -34,9 +34,9 @@ the ``MessageBus`` and trainer updates apply sentinel-aware down-regulation at
 every step. The cochlea outputs both log-mel features and token guesses in a
 single pass. The hippocampus filters episodes using configurable
 ``recall_threshold`` and ``salience_threshold`` so only novel memories pass the
-entorhinal gate【F:human_brain_components_reference.txt†L108-L113】. The baseline
+entorhinal gate【F:elarin/docs/human_brain_components_reference.txt†L108-L113】. The baseline
 from the subthalamic nucleus modulates norepinephrine and acetylcholine to slow
-impulsive actions【F:human_brain_components_reference.txt†L246-L250】. Debug logs
+impulsive actions【F:elarin/docs/human_brain_components_reference.txt†L246-L250】. Debug logs
 now record this baseline together with hippocampal footprint and hormone levels
 for long term analysis. SemanticFlow has been removed; speculative tokens are
 kept only in the temporal lobe. Newly added persistence hooks save LoRA weights
@@ -60,18 +60,18 @@ Each connection mirrors the anatomical ordering described in the reference text.
 
 ## 5. Next Steps
 
-- Measure the impact of modality filtering and the unified Cochlea on reaction time, then refine the executive gating network accordingly【F:human_brain_components_reference.txt†L53-L56】.
-- Stress-test the ``DistributedHippocampus`` using the new memory usage reports and refine salience gating to prevent overload【F:human_brain_components_reference.txt†L108-L113】.
+- Measure the impact of modality filtering and the unified Cochlea on reaction time, then refine the executive gating network accordingly【F:elarin/docs/human_brain_components_reference.txt†L53-L56】.
+- Stress-test the ``DistributedHippocampus`` using the new memory usage reports and refine salience gating to prevent overload【F:elarin/docs/human_brain_components_reference.txt†L108-L113】.
 - **Implemented:** the hippocampus now supports multiple hemispheres via the
   ``cerebral_hemispheres`` setting so each side retains its own memories while
-  sharing recall through the corpus callosum【F:human_brain_components_reference.txt†L11-L14】.
-- Evaluate the new ``memory_pressure`` hook that raises serotonin and lowers dopamine as the hippocampus fills, ensuring stable neurotransmitter levels. Hormone levels are logged alongside the subthalamic baseline for later analysis【F:human_brain_components_reference.txt†L246-L250】.
-- Introduce a small ``serotonin_baseline`` parameter in ``HypothalamusPituitaryAxis`` so levels drift back toward typical values, preventing depressive states when novelty stays low【F:human_brain_components_reference.txt†L190-L208】.
+  sharing recall through the corpus callosum【F:elarin/docs/human_brain_components_reference.txt†L11-L14】.
+- Evaluate the new ``memory_pressure`` hook that raises serotonin and lowers dopamine as the hippocampus fills, ensuring stable neurotransmitter levels. Hormone levels are logged alongside the subthalamic baseline for later analysis【F:elarin/docs/human_brain_components_reference.txt†L246-L250】.
+- Introduce a small ``serotonin_baseline`` parameter in ``HypothalamusPituitaryAxis`` so levels drift back toward typical values, preventing depressive states when novelty stays low【F:elarin/docs/human_brain_components_reference.txt†L190-L208】.
 - Add a matching ``dopamine_baseline`` so reward levels stabilise around 0.5 when no feedback is present.
-- Extend the basal ganglia into explicit caudate/putamen/pallidus/accumbens/nigra modules so action selection aligns with biological circuits.【F:human_brain_components_reference.txt†L219-L245】
+- Extend the basal ganglia into explicit caudate/putamen/pallidus/accumbens/nigra modules so action selection aligns with biological circuits.【F:elarin/docs/human_brain_components_reference.txt†L219-L245】
 - Add an ``approve_action`` stage using the caudate nucleus, globus pallidus and
   subthalamic nucleus to suppress repetitive motor commands and keep the output
-  varied.【F:human_brain_components_reference.txt†L219-L245】【F:human_brain_components_reference.txt†L232-L239】【F:human_brain_components_reference.txt†L246-L250】
+  varied.【F:elarin/docs/human_brain_components_reference.txt†L219-L245】【F:elarin/docs/human_brain_components_reference.txt†L232-L239】【F:elarin/docs/human_brain_components_reference.txt†L246-L250】
 - Refactor the obsolete Default Mode Network into interconnected prefrontal, posterior cingulate and angular gyrus modules.
 - Introduce a curiosity-driven intrinsic motivation module so unexplored tokens receive a small bonus during selection.
 - Predict candidate token valence from hippocampal memories so dopamine rises when an internally simulated action appears rewarding.
@@ -106,7 +106,7 @@ Each connection mirrors the anatomical ordering described in the reference text.
   `cuda:1` and `cuda:2`, while the trainer now uses `cuda:0`.
 - Introduced a configurable `cerebral_hemispheres` option so multiple
   hippocampal hemispheres can be enabled. Additional hemispheres operate like
-  the right hemisphere, meaning Broca's area is not duplicated【F:human_brain_components_reference.txt†L21-L27】【F:human_brain_components_reference.txt†L65-L66】.
+  the right hemisphere, meaning Broca's area is not duplicated【F:elarin/docs/human_brain_components_reference.txt†L21-L27】【F:elarin/docs/human_brain_components_reference.txt†L65-L66】.
 - Spoken input now updates hormone levels by comparing transcripts to the
   valence phrase table, including a new `incorrect` category that boosts
   norepinephrine when detected.
