@@ -32,7 +32,7 @@ settings:
   # Seconds to wait between live loop iterations
   loop_interval: 0.02
   # Audio recording window in seconds
-  audio_duration: 0.25
+  audio_duration: 1
   # Set true to disable video capture and processing
   debug_no_video: false
   log_to_file: true
