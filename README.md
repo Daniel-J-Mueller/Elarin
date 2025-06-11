@@ -1,3 +1,6 @@
+![Elarin Logo](assets/Elarin_Banner_Cropped.png)
+
+
 # Elarin
 
 Elarin is an experiment in building an artificial "brain" composed of small,
