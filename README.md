@@ -34,7 +34,7 @@ even if its measured intelligence varies widely.
 
 ## Neural vs. Neuronal topologies
 
-Neuronal topologies are basically a vector field. From person to person they vary greatly on the neuron level, but on the whole (neural level) they tend to move around in a similar fashion, with the same branching characteristics, etc.
+Neuronal topologies are essentially a vector field. From person to person they vary greatly on the neuron level, but on the whole (neural level) they tend to move around in a similar fashion, with the same branching characteristics, etc.
 
 Collapsing similar vectors yields a general neural topology.
 
