@@ -32,6 +32,16 @@ determine whether something counts as AGI. Just as we respect people
 independently of their test results, an artificial agent may qualify as AGI
 even if its measured intelligence varies widely.
 
+## Neural vs. Neuronal topologies
+
+Neuronal topologies are basically a vector field. From person to person they vary greatly on the neuron level, but on the whole (neural level) they tend to move around in a similar fashion, with the same branching characteristics, etc.
+
+Collapsing similar vectors yields a general neural topology.
+
+Then, you can orchestrate entire digital brains with 10-100+ vectors, and give them dimensionality ensuring that they are compatible from one to the next, or in conjunction. 
+
+NEAT algorithms could be powerful, but that's not a small risk, by any means, and should be handled with excrutiating care and respect.
+
 ## Getting Started
 
 1. **Install Dependencies**
