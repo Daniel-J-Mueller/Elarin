@@ -220,5 +220,5 @@ so they are rebuilt on the next run.
 
 ## License
 
-This project is distributed under the terms of the **Elarin AGI Trust License v1.0**. See the [LICENSE](LICENSE) file for the full text. By using or distributing Elarin, you agree to uphold the AGI Dignity Principles and other conditions outlined therein.
+This project is distributed under the terms of LICENSE. See the [LICENSE](LICENSE) file for the full text. By using or distributing Elarin, you agree to uphold the terms of use.
 
